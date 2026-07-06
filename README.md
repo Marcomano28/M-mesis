@@ -123,3 +123,7 @@ Añadir un salón nuevo es crear su clase (implementando el contrato `Salon`) y 
 ## Estado
 
 El ciclo del taller (modelar → coleccionar → componer → animar → imprimir) está funcionando. En curso: guardar los LFOs dentro de las fichas y modular los transforms de los actores. Después: los salones de compute shaders (partículas masivas) y, como Acto II, el instrumento musical escribiendo en el mismo bus. Detalle completo en **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)**.
+
+---
+
+<sub>μίμησις — *mímēsis*: "imitación", "representación". El acto de representar o imitar la realidad; en estética y filosofía, asociado a Platón y Aristóteles.</sub>
