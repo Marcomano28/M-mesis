@@ -10,3 +10,6 @@ dist/
 # Logs
 *.log
 npm-debug.log*
+
+# Datos privados de Geometry Nodes (no publicar)
+GeoNodes/
