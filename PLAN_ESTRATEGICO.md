@@ -25,9 +25,10 @@ La decisión arquitectónica que hace todo esto posible sigue siendo la misma: *
 |---|---|---|
 | Motor WebGPU (Three.js r182 + TSL) | ✅ | `WebGPURenderer` con fallback WebGL2; indicador de backend en pantalla |
 | Núcleo: ParamBus, contrato Salon, paneles autogenerados (Tweakpane) | ✅ | Pestañas, acciones, tipos `color` y `opciones` (desplegables) |
-| Salón **Formas Exóticas** | ✅ GPU | Clásica + SuperFlor evaluadas en vertex shader; resolución 32–512; exposición Puntos/Alambre/Caras; selector de color; normales por diferencias finitas en shader |
+| Salón **Formas Exóticas** | ✅ GPU | Clásica (Gielis con a/b, perfiles θ/φ independientes, dominio angular, modo nautilus) + SuperFlor evaluadas en vertex shader; resolución 8–512; exposición Puntos/Alambre/Caras; selector de color; normales por diferencias finitas en shader |
 | Salón **Trazo y Grafito** (cross-hatching) | ✅ | Tramado procedural TSL por niveles de luz + temblor + grano; importación GLB; pestaña wireframe |
 | Salón **Bajo Relieve** | ✅ | Extrusión por estela del puntero (canvas 2D→textura); 6 niveles de textura + paleta cosenoidal; pestaña wireframe; GLB por defecto en `public/` |
+| Salón **Delaunay** | ✅ GPU | Triangulación (Delaunator, CPU) + anidado instanciado en GPU (TSL); figura Plano/Room (cara apagable); degradado de color y extrude dentro/fuera por profundidad; poda LOD adaptativa por área de triángulo |
 | **Fichas** (cajonera) | ✅ | Captura de miniatura sincronizada con el frame WebGPU; IndexedDB; cargar/borrar; los paneles respetan valores cargados |
 | **El Escenario** | ✅ | Botón ➕ en cards → actor con instancia propia del salón (uniforms independientes); transforms por actor; giro global; la composición persiste al navegar |
 | **Escenas como fichas** | ✅ | ☆ en el Escenario guarda la composición completa (campo `extra` de la ficha, hooks `estadoExtra`/`cargarEstadoExtra`); clic en la card restaura los actores |
@@ -85,15 +86,16 @@ La decisión arquitectónica que hace todo esto posible sigue siendo la misma: *
 
 | # | Salón | Estado | Contenido |
 |---|---|---|---|
-| 1 | **Formas Exóticas** | ✅ GPU | Supershape clásica + SuperFlor combinada abierta (supeFlower). Resolución/vistas/color |
+| 1 | **Formas Exóticas** | ✅ GPU | Supershape clásica (Gielis a/b, θ/φ independientes, nautilus) + SuperFlor combinada abierta (supeFlower). Resolución/vistas/color |
 | 2 | **Trazo y Grafito** | ✅ | Cross-hatching + sketchy pencil sobre GLB (refs: spite/sketch, Codrops) |
 | 3 | **Bajo Relieve** | ✅ | Relieve revelado por estela del puntero (ref: proyecto immersive) |
+| 4 | **Delaunay** | ✅ GPU | Triangulación (Delaunator) + anidado instanciado; figura Plano/Room; degradado, extrude, LOD adaptativo (ref: Room.js propio) |
 | — | **El Escenario** | ✅ MVP | Sala de montaje: no es una fábrica, compone las demás |
-| 4 | Materia de Puntos | ◻ planificado | Partículas masivas, campos de flujo, cascadas (ref: cascadapaisaje) — compute shaders |
-| 5 | Campos y Ruido | ◻ planificado | FBM, domain warping, texturas vivas |
-| 6 | Líneas y Trazos | ◻ planificado | Ribbons, atractores, caligrafía generativa |
-| 7 | Materiales Imposibles | ◻ planificado | Vidrio, iridiscencia, refracción |
-| 8 | Luz y Atmósfera | ◻ planificado | Volumétricos, raymarching, bloom esculpido |
+| 5 | Materia de Puntos | ◻ planificado | Partículas masivas, campos de flujo, cascadas (ref: cascadapaisaje) — compute shaders |
+| 6 | Campos y Ruido | ◻ planificado | FBM, domain warping, texturas vivas |
+| 7 | Líneas y Trazos | ◻ planificado | Ribbons, atractores, caligrafía generativa |
+| 8 | Materiales Imposibles | ◻ planificado | Vidrio, iridiscencia, refracción |
+| 9 | Luz y Atmósfera | ◻ planificado | Volumétricos, raymarching, bloom esculpido |
 
 ---
 
