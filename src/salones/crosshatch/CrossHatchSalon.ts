@@ -1,0 +1,216 @@
+// Salón — Trazo y Grafito: cross-hatching + sketchy pencil sobre modelos GLB.
+//
+// Referencias estéticas:
+//   · spite/sketch (inktober 2020): tramado por niveles de luz, papel, grabado.
+//   · Codrops "Sketchy Pencil Effect": temblor de línea + grano de papel.
+//
+// Técnica: en lugar del GLSL WebGL2 de las referencias, el tramado se hace
+// procedural en TSL (compila a WGSL y GLSL a la vez). La iluminación lambert
+// se cuantiza en 4 niveles; cada nivel activa una capa de rayado en espacio
+// de pantalla con ángulo propio. El «temblor» perturba las coordenadas con
+// ruido (lápiz), y el grano ensucia el papel.
+//
+// Camino de mejora (v2): contornos por detección de bordes sobre normales/
+// profundidad con THREE.PostProcessing (el outline del efecto Codrops).
+
+import * as THREE from 'three/webgpu';
+import {
+  Fn, uniform, float, vec3, mix, dot, normalize, fract, abs,
+  sin, cos, clamp, smoothstep, screenCoordinate, normalWorld, mx_noise_float,
+} from 'three/tsl';
+import { elegirYCargarGLB } from '../../core/CargadorGLB';
+import type { Salon, Params, ParamDef, Accion } from '../../core/Salon';
+
+export class CrossHatchSalon implements Salon {
+  id = 'crosshatch';
+  nombre = 'Trazo y Grafito';
+
+  params: ParamDef[] = [
+    { clave: 'escala',     etiqueta: 'escala trama',  valor: 0.12, min: 0.02, max: 0.4 },
+    { clave: 'grosor',     etiqueta: 'grosor línea',  valor: 0.5,  min: 0.1,  max: 0.95 },
+    { clave: 'angulo',     etiqueta: 'ángulo (°)',    valor: 45,   min: 0,    max: 180, paso: 1 },
+    { clave: 'temblor',    etiqueta: 'temblor',       valor: 0.35, min: 0,    max: 1.5 },
+    { clave: 'grano',      etiqueta: 'grano papel',   valor: 0.4,  min: 0,    max: 1 },
+    { clave: 'intensidad', etiqueta: 'intensidad',    valor: 1,    min: 0,    max: 2 },
+    { clave: 'luzAzimut',  etiqueta: 'luz azimut(°)', valor: 60,   min: 0,    max: 360, paso: 1 },
+    { clave: 'luzAltura',  etiqueta: 'luz altura(°)', valor: 35,   min: -80,  max: 80,  paso: 1 },
+    { clave: 'giro',       etiqueta: 'giro',          valor: 0.2,  min: -2,   max: 2 },
+  ];
+
+  acciones: Accion[] = [{ titulo: '📦 Cargar modelo GLB…', fn: () => this.cargarGLB() }];
+
+  // Uniforms TSL: el puente entre el ParamBus y el shader.
+  private u = {
+    escala: uniform(0.12),
+    grosor: uniform(0.5),
+    angulo: uniform(Math.PI / 4),
+    temblor: uniform(0.35),
+    grano: uniform(0.4),
+    intensidad: uniform(1),
+    luzAzimut: uniform(Math.PI / 3),
+    luzAltura: uniform(0.6),
+  };
+
+  private grupo = new THREE.Group();
+  private material!: THREE.MeshBasicNodeMaterial;
+  private fondoPrevio: THREE.Color | THREE.Texture | null = null;
+
+  init(escena: THREE.Scene): void {
+    this.material = this.crearMaterial();
+
+    // Modelo por defecto mientras no se carga un GLB.
+    const defecto = new THREE.Mesh(new THREE.TorusKnotGeometry(1, 0.35, 220, 36), this.material);
+    this.grupo.add(defecto);
+    escena.add(this.grupo);
+
+    this.fondoPrevio = escena.background as THREE.Color | null;
+    escena.background = new THREE.Color(0xf3f0e8); // papel también fuera del modelo
+  }
+
+  update(dt: number, _t: number, p: Params): void {
+    const u = this.u;
+    u.escala.value = p.escala;
+    u.grosor.value = p.grosor;
+    u.angulo.value = (p.angulo * Math.PI) / 180;
+    u.temblor.value = p.temblor;
+    u.grano.value = p.grano;
+    u.intensidad.value = p.intensidad;
+    u.luzAzimut.value = (p.luzAzimut * Math.PI) / 180;
+    u.luzAltura.value = (p.luzAltura * Math.PI) / 180;
+    this.grupo.rotation.y += (p.giro ?? 0) * dt;
+  }
+
+  dispose(escena: THREE.Scene): void {
+    escena.remove(this.grupo);
+    this.grupo.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+    this.grupo.clear();
+    this.material.dispose();
+    escena.background = this.fondoPrevio;
+  }
+
+  // ————— El material (corazón del salón) —————
+
+  private crearMaterial(): THREE.MeshBasicNodeMaterial {
+    const u = this.u;
+    const mat = new THREE.MeshBasicNodeMaterial();
+
+    mat.colorNode = Fn(() => {
+      // Iluminación lambert con luz direccional propia (esférica → cartesiana)
+      const L = normalize(vec3(
+        cos(u.luzAltura).mul(cos(u.luzAzimut)),
+        sin(u.luzAltura),
+        cos(u.luzAltura).mul(sin(u.luzAzimut)),
+      ));
+      const lum = clamp(dot(normalWorld, L), 0.0, 1.0);
+
+      // Coordenadas de pantalla + temblor de lápiz (ruido)
+      const px = screenCoordinate.xy.mul(u.escala);
+      const p = px.add(mx_noise_float(px.mul(0.5)).mul(u.temblor));
+
+      // 4 capas de rayado: cuanto más oscuro el lambert, más capas se cruzan
+      const umbrales = [0.8, 0.55, 0.32, 0.14];
+      const desfases = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4];
+      let tinta = float(0.0).add(0.0);
+      for (let i = 0; i < 4; i++) {
+        const ang = u.angulo.add(desfases[i]);
+        const yr = p.x.mul(sin(ang)).add(p.y.mul(cos(ang)));            // coord rotada
+        const dist = abs(fract(yr).sub(0.5)).mul(2.0);                   // 0 = centro de línea
+        const linea = smoothstep(u.grosor.mul(0.55), u.grosor, dist).oneMinus();
+        const sombra = smoothstep(umbrales[i] - 0.07, umbrales[i] + 0.07, lum).oneMinus();
+        tinta = tinta.add(linea.mul(sombra));
+      }
+      const cubierta = clamp(tinta.mul(u.intensidad), 0.0, 1.0);
+
+      // Papel con grano + grafito
+      const ruidoPapel = mx_noise_float(screenCoordinate.xy.mul(0.9)).mul(0.5).add(0.5);
+      const papel = vec3(0.955, 0.94, 0.9).sub(ruidoPapel.mul(u.grano).mul(0.14));
+      const grafito = vec3(0.13, 0.13, 0.17);
+      return mix(papel, grafito, cubierta);
+    })();
+
+    return mat;
+  }
+
+  // ————— Importación GLB —————
+
+  private cargarGLB(): void {
+    elegirYCargarGLB((escena) => this.montarModelo(escena));
+  }
+
+  private montarModelo(modelo: THREE.Object3D): void {
+    // Aplicar el material de trazo a todas las mallas del GLB
+    modelo.traverse((o) => { if (o instanceof THREE.Mesh) o.material = this.material; });
+
+    // Centrar y normalizar tamaño (que cualquier modelo quepa igual en escena)
+    const caja = new THREE.Box3().setFromObject(modelo);
+    const centro = caja.getCenter(new THREE.Vector3());
+    const dimension = caja.getSize(new THREE.Vector3()).length() || 1;
+    modelo.position.sub(centro);
+    modelo.scale.setScalar(3.4 / dimension);
+
+    this.grupo.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+    this.grupo.clear();
+    this.grupo.add(modelo);
+  }
+
+  // ————— Exportador —————
+
+  exportar(p: Params): string {
+    return PLANTILLA_EXPORT.replaceAll('__PARAMS__', JSON.stringify(p));
+  }
+}
+
+// HTML autocontenido (WebGPU + TSL vía CDN, mismo shader).
+// v1 exporta con el TorusKnot; para usar tu GLB, sirve el archivo junto al
+// HTML y descomenta el bloque GLTFLoader señalado abajo.
+const PLANTILLA_EXPORT = `<!doctype html>
+<html><head><meta charset="utf-8"><title>MIA — trazo y grafito</title>
+<style>html,body{margin:0;height:100%;background:#f3f0e8;overflow:hidden}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js",
+  "three/webgpu":"https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js",
+  "three/tsl":"https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.tsl.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+}}</script>
+</head><body><script type="module">
+import * as THREE from 'three';
+import { Fn, uniform, float, vec3, mix, dot, normalize, fract, abs, sin, cos, clamp, smoothstep, screenCoordinate, normalWorld, mx_noise_float } from 'three/tsl';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const P = __PARAMS__, rad = (g)=>g*Math.PI/180;
+const mat = new THREE.MeshBasicNodeMaterial();
+mat.colorNode = Fn(() => {
+  const L = normalize(vec3(Math.cos(rad(P.luzAltura))*Math.cos(rad(P.luzAzimut)), Math.sin(rad(P.luzAltura)), Math.cos(rad(P.luzAltura))*Math.sin(rad(P.luzAzimut))));
+  const lum = clamp(dot(normalWorld, L), 0.0, 1.0);
+  const px = screenCoordinate.xy.mul(P.escala);
+  const p = px.add(mx_noise_float(px.mul(0.5)).mul(P.temblor));
+  const umbrales = [0.8, 0.55, 0.32, 0.14], desfases = [0, Math.PI/2, Math.PI/4, -Math.PI/4];
+  let tinta = float(0.0).add(0.0);
+  for (let i = 0; i < 4; i++) {
+    const a = rad(P.angulo) + desfases[i];
+    const yr = p.x.mul(Math.sin(a)).add(p.y.mul(Math.cos(a)));
+    const dist = abs(fract(yr).sub(0.5)).mul(2.0);
+    const linea = smoothstep(P.grosor*0.55, P.grosor, dist).oneMinus();
+    const sombra = smoothstep(umbrales[i]-0.07, umbrales[i]+0.07, lum).oneMinus();
+    tinta = tinta.add(linea.mul(sombra));
+  }
+  const cubierta = clamp(tinta.mul(P.intensidad), 0.0, 1.0);
+  const ruido = mx_noise_float(screenCoordinate.xy.mul(0.9)).mul(0.5).add(0.5);
+  const papel = vec3(0.955, 0.94, 0.9).sub(ruido.mul(P.grano).mul(0.14));
+  return mix(papel, vec3(0.13, 0.13, 0.17), cubierta);
+})();
+const grupo = new THREE.Group();
+grupo.add(new THREE.Mesh(new THREE.TorusKnotGeometry(1, .35, 220, 36), mat));
+// — Para usar tu modelo: —
+// import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// new GLTFLoader().load('modelo.glb', (g) => { grupo.clear();
+//   g.scene.traverse(o => { if (o.isMesh) o.material = mat; }); grupo.add(g.scene); });
+const escena = new THREE.Scene(); escena.background = new THREE.Color(0xf3f0e8); escena.add(grupo);
+const cam = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, .1, 100); cam.position.z = 6;
+const r = new THREE.WebGPURenderer({antialias:true}); await r.init();
+r.setSize(innerWidth,innerHeight); r.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.appendChild(r.domElement);
+const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true;
+const reloj = new THREE.Clock();
+r.setAnimationLoop(()=>{ grupo.rotation.y += P.giro*reloj.getDelta(); ctl.update(); r.render(escena,cam); });
+addEventListener('resize',()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); r.setSize(innerWidth,innerHeight); });
+</script></body></html>`;

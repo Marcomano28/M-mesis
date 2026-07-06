@@ -1,0 +1,106 @@
+<svg viewBox="0 0 1000 820" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8a7ff0"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="820" fill="#12121a"/>
+  <text x="500" y="40" text-anchor="middle" fill="#f0eee9" font-size="26" font-weight="bold">MIA — El Taller · Esquema v2</text>
+  <text x="500" y="63" text-anchor="middle" fill="#9a96a8" font-size="13">modelar (salones) · coleccionar (fichas) · componer (escenario) · tocar (instrumento)</text>
+
+  <!-- SHELL -->
+  <rect x="60" y="88" width="880" height="66" rx="10" fill="#1e1b2e" stroke="#5a4fcf" stroke-width="1.5"/>
+  <text x="500" y="114" text-anchor="middle" fill="#c9c2ff" font-size="15" font-weight="bold">SHELL</text>
+  <text x="500" y="136" text-anchor="middle" fill="#9a96a8" font-size="12">selector de salones · cajonera 🗂 · panel de actores 🎭 · panel de errores · indicador WebGPU</text>
+
+  <!-- NUCLEO -->
+  <rect x="60" y="172" width="880" height="92" rx="10" fill="#1a2333" stroke="#3f7fbf" stroke-width="1.5"/>
+  <text x="500" y="196" text-anchor="middle" fill="#9fd0ff" font-size="15" font-weight="bold">NÚCLEO</text>
+  <g font-size="12" fill="#e8e6f0" text-anchor="middle">
+    <rect x="80" y="208" width="190" height="42" rx="7" fill="#233047"/>
+    <text x="175" y="226">ParamBus</text>
+    <text x="175" y="241" fill="#8fa8c8" font-size="10">direcciones salon.param</text>
+    <rect x="285" y="208" width="200" height="42" rx="7" fill="#233047"/>
+    <text x="385" y="226">Engine WebGPU + TSL</text>
+    <text x="385" y="241" fill="#8fa8c8" font-size="10">fallback WebGL2 · captura frame</text>
+    <rect x="500" y="208" width="200" height="42" rx="7" fill="#233047"/>
+    <text x="600" y="226">AlmacenFichas</text>
+    <text x="600" y="241" fill="#8fa8c8" font-size="10">IndexedDB · miniatura + params</text>
+    <rect x="715" y="208" width="205" height="42" rx="7" fill="#233047"/>
+    <text x="817" y="226">Exportador «Imprimir»</text>
+    <text x="817" y="241" fill="#8fa8c8" font-size="10">HTML autocontenido / JSON escena</text>
+  </g>
+
+  <!-- SALONES -->
+  <rect x="60" y="284" width="600" height="200" rx="10" fill="#1c2a22" stroke="#3fae6a" stroke-width="1.5"/>
+  <text x="360" y="308" text-anchor="middle" fill="#a5e8c0" font-size="15" font-weight="bold">SALONES (fábricas de figuras)</text>
+  <g font-size="11.5" fill="#e8f2ea" text-anchor="middle">
+    <rect x="80" y="322" width="180" height="64" rx="7" fill="#243b2e" stroke="#5fce8a"/>
+    <text x="170" y="343" font-weight="bold">✅ Formas Exóticas</text>
+    <text x="170" y="359" fill="#8fc8a5" font-size="10">supershape + superflor · GPU</text>
+    <text x="170" y="374" fill="#8fc8a5" font-size="10">puntos/alambre/caras · color</text>
+    <rect x="270" y="322" width="180" height="64" rx="7" fill="#243b2e" stroke="#5fce8a"/>
+    <text x="360" y="343" font-weight="bold">✅ Trazo y Grafito</text>
+    <text x="360" y="359" fill="#8fc8a5" font-size="10">cross-hatching TSL · GLB</text>
+    <text x="360" y="374" fill="#8fc8a5" font-size="10">temblor · grano · wireframe</text>
+    <rect x="460" y="322" width="180" height="64" rx="7" fill="#243b2e" stroke="#5fce8a"/>
+    <text x="550" y="343" font-weight="bold">✅ Bajo Relieve</text>
+    <text x="550" y="359" fill="#8fc8a5" font-size="10">estela revela extrusión</text>
+    <text x="550" y="374" fill="#8fc8a5" font-size="10">paleta cosenoidal · GLB</text>
+    <rect x="80" y="398" width="560" height="66" rx="7" fill="#20301f" stroke="#3fae6a" stroke-dasharray="4 3" stroke-opacity="0.6"/>
+    <text x="360" y="422" fill="#9dbf9a">◻ Planificados: Materia de Puntos (compute) · Campos y Ruido · Líneas y Trazos</text>
+    <text x="360" y="440" fill="#9dbf9a">Materiales Imposibles · Luz y Atmósfera</text>
+  </g>
+
+  <!-- ESCENARIO -->
+  <rect x="690" y="284" width="250" height="200" rx="10" fill="#2d2416" stroke="#d9a53f" stroke-width="1.8"/>
+  <text x="815" y="308" text-anchor="middle" fill="#ffe3a8" font-size="15" font-weight="bold">🎭 EL ESCENARIO</text>
+  <g font-size="11" fill="#eadfc8" text-anchor="middle">
+    <text x="815" y="332">sala de montaje (✅ MVP)</text>
+    <rect x="710" y="344" width="210" height="54" rx="7" fill="#3d3220"/>
+    <text x="815" y="363">ACTOR = ficha + transform</text>
+    <text x="815" y="380" fill="#c8b385" font-size="10">instancia propia vía FÁBRICAS</text>
+    <text x="815" y="418" fill="#c8b385" font-size="10">x/y/z · rotación · escala · giro global</text>
+    <text x="815" y="436" fill="#c8b385" font-size="10">composición persistente</text>
+    <text x="815" y="454" fill="#c8b385" font-size="10">Imprimir → JSON de escena</text>
+  </g>
+
+  <!-- FICHAS -->
+  <rect x="60" y="508" width="880" height="86" rx="10" fill="#251c2e" stroke="#a55fcf" stroke-width="1.5"/>
+  <text x="500" y="532" text-anchor="middle" fill="#e0b8ff" font-size="15" font-weight="bold">🗂 CAJONERA — fichas (depósito de obra, IndexedDB)</text>
+  <text x="500" y="554" text-anchor="middle" fill="#b895cc" font-size="11.5">☆ Guardar ficha (miniatura + params exactos) · clic = recargar idéntica · ➕ = añadir al Escenario como actor</text>
+  <text x="500" y="576" text-anchor="middle" fill="#8f7aa3" font-size="10.5">la ficha es la unidad de colección Y de composición</text>
+
+  <!-- FUENTES -->
+  <rect x="60" y="618" width="880" height="100" rx="10" fill="#2e1f24" stroke="#cf5f7a" stroke-width="1.5"/>
+  <text x="500" y="642" text-anchor="middle" fill="#ffb8c9" font-size="15" font-weight="bold">FUENTES DE MODULACIÓN → escriben en el ParamBus</text>
+  <g font-size="11.5" fill="#f2e8ea" text-anchor="middle">
+    <rect x="80" y="656" width="200" height="48" rx="7" fill="#402b32" stroke="#cf5f7a" stroke-opacity="0.7"/>
+    <text x="180" y="676">✅ Sliders / Paneles</text>
+    <text x="180" y="692" fill="#d8a0af" font-size="10">Tweakpane autogenerado</text>
+    <rect x="295" y="656" width="180" height="48" rx="7" fill="#402b32" stroke="#cf5f7a" stroke-opacity="0.7"/>
+    <text x="385" y="676">✅ Fichas / Presets</text>
+    <text x="385" y="692" fill="#d8a0af" font-size="10">valores exactos guardados</text>
+    <rect x="490" y="656" width="180" height="48" rx="7" fill="#402b32" stroke="#cf5f7a" stroke-dasharray="4 3" stroke-opacity="0.6"/>
+    <text x="580" y="676" fill="#d8a0af">◻ LFOs (Fase B)</text>
+    <text x="580" y="692" fill="#b98995" font-size="10">respiración autónoma</text>
+    <rect x="685" y="656" width="235" height="48" rx="7" fill="#402b32" stroke="#cf5f7a" stroke-dasharray="4 3" stroke-opacity="0.6"/>
+    <text x="802" y="676" fill="#d8a0af">◻ Guitarra / MIDI (Fase D)</text>
+    <text x="802" y="692" fill="#b98995" font-size="10">Web Audio · Meyda/Essentia · mapeo sinestésico</text>
+  </g>
+
+  <!-- flechas -->
+  <g stroke="#8a7ff0" stroke-width="1.6" fill="none">
+    <line x1="500" y1="154" x2="500" y2="172" marker-end="url(#arr)"/>
+    <line x1="360" y1="264" x2="360" y2="284" marker-end="url(#arr)"/>
+    <line x1="815" y1="264" x2="815" y2="284" marker-end="url(#arr)"/>
+    <line x1="360" y1="484" x2="360" y2="508" marker-end="url(#arr)"/>
+    <line x1="815" y1="508" x2="815" y2="484" marker-end="url(#arr)"/>
+    <line x1="500" y1="618" x2="500" y2="596" marker-end="url(#arr)"/>
+  </g>
+  <text x="345" y="500" fill="#8a7ff0" font-size="10">☆ guardar</text>
+  <text x="828" y="500" fill="#8a7ff0" font-size="10">➕ actor</text>
+
+  <text x="500" y="760" text-anchor="middle" fill="#6a6478" font-size="11">Regla de oro: los salones solo entienden de parámetros — nunca saben si los mueve un slider, una ficha, un LFO o una guitarra.</text>
+  <text x="500" y="782" text-anchor="middle" fill="#55506a" font-size="10">Hoja de ruta: A) escenas guardadas + export HTML del Escenario → B) LFOs → C) salones 4–8 → D) el instrumento</text>
+</svg>
