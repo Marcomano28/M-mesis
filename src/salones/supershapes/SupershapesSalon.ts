@@ -1,19 +1,22 @@
-// Salón 1 — Formas Exóticas. Dos figuras (pestañas):
+// Salón 1 — Formas Exóticas. Tres figuras (pestañas):
 //
 //   · Clásica   — supershape cerrada (esférica).
 //   · SuperFlor — superficie ABIERTA combinada (r1·r2) del proyecto supeFlower.
+//   · Serpiente — cuerpo orgánico animado (ruido simplex + envolvente de vida)
+//                 del mismo proyecto supeFlower. r1 en X, r2 en Y (separadas).
 //
 // Cada figura tiene TRES modos de exposición: puntos, alambre y caras,
 // más resolución variable y color — los atributos que heredan las fichas.
 //
-// ★ GPU: la geometría es una retícula (u,v) estática; las posiciones y
-//   normales se evalúan en el vertex/fragment shader desde uniforms.
-//   Solo el cambio de RESOLUCIÓN regenera la retícula (barata: es un grid).
+// ★ GPU: Clásica y SuperFlor son retículas (u,v) estáticas evaluadas en el
+//   vertex/fragment shader desde uniforms; solo la RESOLUCIÓN regenera el grid.
+// ★ CPU: la Serpiente es geometría reconstruida cada frame (ruido + azar por
+//   instancia + scroll temporal), fiel al sketch original de Processing.
 
 import * as THREE from 'three/webgpu';
 import {
   Fn, uniform, float, vec3, vec4, uv, mix, abs, sin, cos, exp, max,
-  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix,
+  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute,
 } from 'three/tsl';
 import type { Salon, Params, ParamDef, Pestana } from '../../core/Salon';
 
@@ -85,6 +88,31 @@ export class SupershapesSalon implements Salon {
         { clave: 'yBase',   etiqueta: 'yBase',   valor: 40,  min: 0,   max: 100,  paso: 1 },
       ],
     },
+    {
+      titulo: 'Serpiente',
+      params: [
+        { clave: 'velocidad', etiqueta: 'velocidad',      valor: 0.3,   min: 0,   max: 2 },
+        { clave: 'sR',        etiqueta: 'radio (R)',       valor: 200,   min: 50,  max: 400,  paso: 1 },
+        { clave: 'sZ',        etiqueta: 'largo (Z)',       valor: 1000,  min: 200, max: 2000, paso: 10 },
+        { clave: 'sTrn',      etiqueta: 'giro perfil',     valor: 3.4,   min: 0,   max: 6.283 },
+        { clave: 'sMV',       etiqueta: 'vida desde',      valor: -0.15, min: -1,  max: 0 },
+        { clave: 'sMXV',      etiqueta: 'vida hasta',      valor: 1.35,  min: 0.5, max: 2 },
+        // — Retícula de instancias (recrea buffers al cambiar) —
+        { clave: 'sN1',       etiqueta: 'aros (N1)',       valor: 30,    min: 6,   max: 60,  paso: 1 },
+        { clave: 'sN',        etiqueta: 'gajos (N)',       valor: 12,    min: 3,   max: 24,  paso: 1 },
+        { clave: 'sN2',       etiqueta: 'longitud (N2)',   valor: 80,    min: 20,  max: 160, paso: 1 },
+        // — Perfil r1 (eje X) —
+        { clave: 'sr1m',  etiqueta: 'r1 · m',  valor: 5,   min: 1,    max: 20, paso: 1 },
+        { clave: 'sr1n1', etiqueta: 'r1 · n1', valor: 0.1, min: 0.01, max: 5 },
+        { clave: 'sr1n2', etiqueta: 'r1 · n2', valor: 1.7, min: 0.01, max: 5 },
+        { clave: 'sr1n3', etiqueta: 'r1 · n3', valor: 1.7, min: 0.01, max: 5 },
+        // — Perfil r2 (eje Y) —
+        { clave: 'sr2m',  etiqueta: 'r2 · m',  valor: 7,   min: 1,    max: 20, paso: 1 },
+        { clave: 'sr2n1', etiqueta: 'r2 · n1', valor: 0.3, min: 0.01, max: 5 },
+        { clave: 'sr2n2', etiqueta: 'r2 · n2', valor: 0.5, min: 0.01, max: 5 },
+        { clave: 'sr2n3', etiqueta: 'r2 · n3', valor: 0.5, min: 0.01, max: 5 },
+      ],
+    },
   ];
 
   // — Uniforms: el único canal CPU→GPU tras la carga inicial —
@@ -110,11 +138,25 @@ export class SupershapesSalon implements Salon {
   private geoF: THREE.BufferGeometry | null = null;
   private resActual = 0;
 
+  // — Serpiente: geometría CPU animada (no usa positionNode) —
+  private objS: { puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh } | null = null;
+  private geoS: THREE.BufferGeometry | null = null;
+  private posS: Float32Array | null = null;
+  private colS: Float32Array | null = null;
+  private noise2D = makeNoise2D();
+  private instS: DtInstance[] = [];
+  private tSerp = 0;
+  private serpCounts = { N1: 0, N: 0, N2: 0 };
+
   init(escena: THREE.Scene): void {
     this.objC = this.crearRepresentaciones(this.nodoPosClasica(), this.nodoColorClasica());
     this.objF = this.crearRepresentaciones(this.nodoPosFlor(), this.nodoColorFlor());
     this.objF.puntos.rotation.x = this.objF.alambre.rotation.x = this.objF.caras.rotation.x = 2.97;
-    for (const o of [this.objC, this.objF]) this.grupo.add(o.puntos, o.alambre, o.caras);
+    this.objS = this.crearSerpiente();
+    for (const o of [this.objS.puntos, this.objS.alambre, this.objS.caras]) {
+      o.rotation.set(Math.PI * 0.9, Math.PI * 0.65, 0);
+    }
+    for (const o of [this.objC, this.objF, this.objS]) this.grupo.add(o.puntos, o.alambre, o.caras);
     escena.add(this.grupo);
     this.resActual = 0; // fuerza regeneración de retícula en el primer update
   }
@@ -128,7 +170,7 @@ export class SupershapesSalon implements Salon {
     }
 
     // — Visibilidad: figura activa (pestaña) × modo de exposición —
-    const modo = p.modo === 1 ? 1 : 0;
+    const modo = p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
     const vista = p.vista === 1 ? 1 : p.vista === 2 ? 2 : 0;
     const aplicar = (o: typeof this.objC, activa: boolean) => {
       if (!o) return;
@@ -138,6 +180,10 @@ export class SupershapesSalon implements Salon {
     };
     aplicar(this.objC, modo === 0);
     aplicar(this.objF, modo === 1);
+    aplicar(this.objS, modo === 2);
+
+    // — Serpiente: solo se reconstruye (CPU) mientras su pestaña está activa —
+    if (modo === 2) this.actualizarSerpiente(dt, p);
 
     // — Uniforms —
     const c = this.uC;
@@ -167,13 +213,16 @@ export class SupershapesSalon implements Salon {
     escena.remove(this.grupo);
     this.geoC?.dispose();
     this.geoF?.dispose();
-    for (const o of [this.objC, this.objF]) {
+    this.geoS?.dispose();
+    for (const o of [this.objC, this.objF, this.objS]) {
       if (!o) continue;
       (o.puntos.material as THREE.Material).dispose();
       (o.alambre.material as THREE.Material).dispose();
       (o.caras.material as THREE.Material).dispose();
     }
-    this.objC = this.objF = null;
+    this.objC = this.objF = this.objS = null;
+    this.geoS = this.posS = this.colS = null;
+    this.instS = [];
     this.grupo.clear();
   }
 
@@ -208,6 +257,63 @@ export class SupershapesSalon implements Salon {
     this.geoF = new THREE.PlaneGeometry(1, 1, res, Math.max(6, Math.round(res * 0.75)));
     if (this.objC) this.objC.puntos.geometry = this.objC.alambre.geometry = this.objC.caras.geometry = this.geoC;
     if (this.objF) this.objF.puntos.geometry = this.objF.alambre.geometry = this.objF.caras.geometry = this.geoF;
+  }
+
+  // ————— Serpiente (CPU animada) —————
+
+  private crearSerpiente() {
+    const geo = new THREE.BufferGeometry(); // se dimensiona en regenerarSerpiente
+
+    const matPuntos = new THREE.PointsNodeMaterial();
+    matPuntos.colorNode = this.uColor;
+
+    const matAlambre = new THREE.MeshBasicNodeMaterial({ wireframe: true, transparent: true, opacity: 0.5 });
+    matAlambre.colorNode = this.uColor;
+
+    const matCaras = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+    matCaras.colorNode = attribute('color', 'vec3').mul(this.uColor); // color por vértice × tinte del panel
+
+    return {
+      puntos: new THREE.Points(geo, matPuntos),
+      alambre: new THREE.Mesh(geo, matAlambre),
+      caras: new THREE.Mesh(geo, matCaras),
+    };
+  }
+
+  private regenerarSerpiente(N1: number, N: number, N2: number): void {
+    const K = Math.ceil(N2 / N);
+    const verts = N1 * N * K * 4 * 3; // instancias × K × 4 triángulos × 3 vértices
+    this.geoS?.dispose();
+    this.posS = new Float32Array(verts * 3);
+    this.colS = new Float32Array(verts * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.posS, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.colS, 3));
+    this.geoS = geo;
+    if (this.objS) this.objS.puntos.geometry = this.objS.alambre.geometry = this.objS.caras.geometry = geo;
+    this.instS = makeDtInstances(N1, N); // semillas/azar por instancia: se recalculan al cambiar el conteo
+    this.serpCounts = { N1, N, N2 };
+  }
+
+  private actualizarSerpiente(dt: number, p: Params): void {
+    const N1 = Math.max(6, Math.round(p.sN1 ?? 30));
+    const N = Math.max(3, Math.round(p.sN ?? 12));
+    const N2 = Math.max(20, Math.round(p.sN2 ?? 80));
+    if (N1 !== this.serpCounts.N1 || N !== this.serpCounts.N || N2 !== this.serpCounts.N2) {
+      this.regenerarSerpiente(N1, N, N2);
+    }
+    this.tSerp += dt * (p.velocidad ?? 0.3);
+    const cfg: SerpCfg = {
+      R: p.sR ?? 200, Z: p.sZ ?? 1000, trn: p.sTrn ?? 3.4,
+      MV: p.sMV ?? -0.15, MXV: p.sMXV ?? 1.35,
+      N1, N, N2, K: Math.ceil(N2 / N),
+      r1: [p.sr1m ?? 5, p.sr1n1 ?? 0.1, p.sr1n2 ?? 1.7, p.sr1n3 ?? 1.7],
+      r2: [p.sr2m ?? 7, p.sr2n1 ?? 0.3, p.sr2n2 ?? 0.5, p.sr2n3 ?? 0.5],
+    };
+    buildTriangles(this.instS, this.tSerp, this.noise2D, this.posS!, this.colS!, cfg);
+    (this.geoS!.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (this.geoS!.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+    this.geoS!.computeBoundingSphere();
   }
 
   // ————— Grafos TSL —————
@@ -339,12 +445,173 @@ export class SupershapesSalon implements Salon {
   // ————— Exportador (plantillas autocontenidas; siguen siendo CPU, válido para piezas sueltas) —————
 
   exportar(p: Params): string {
-    const plantilla = (p.modo ?? 0) === 0 ? PLANTILLA_CLASICA : PLANTILLA_FLOR;
+    const modo = p.modo ?? 0;
+    const plantilla = modo === 2 ? PLANTILLA_SERPIENTE : modo === 1 ? PLANTILLA_FLOR : PLANTILLA_CLASICA;
     return plantilla
       .replaceAll('__PARAMS__', JSON.stringify(p))
       .replaceAll('__RES__', '128')
       .replaceAll('__N1__', '60')
       .replaceAll('__N2__', '28');
+  }
+}
+
+// ————— Serpiente: helpers CPU (port de supeFlower/Serpiente.tsx) —————
+
+interface DtInstance { seed: number; off: number; di: number; i: number; j: number }
+
+interface SerpCfg {
+  R: number; Z: number; trn: number; MV: number; MXV: number;
+  N1: number; N: number; N2: number; K: number;
+  r1: [number, number, number, number];
+  r2: [number, number, number, number];
+}
+
+/** Ruido simplex 2D inline (equivalente al OpenSimplexNoise del sketch original). */
+function makeNoise2D(): (x: number, y: number) => number {
+  const F2 = 0.5 * (Math.sqrt(3) - 1);
+  const G2 = (3 - Math.sqrt(3)) / 6;
+  const grad3 = [
+    [1, 1], [-1, 1], [1, -1], [-1, -1],
+    [1, 0], [-1, 0], [1, 0], [-1, 0],
+    [0, 1], [0, -1], [0, 1], [0, -1],
+  ];
+  const p = Array.from({ length: 256 }, (_, i) => i);
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  const perm = Array.from({ length: 512 }, (_, i) => p[i & 255]);
+
+  return function noise2D(xin: number, yin: number): number {
+    const s = (xin + yin) * F2;
+    const i = Math.floor(xin + s);
+    const j = Math.floor(yin + s);
+    const t = (i + j) * G2;
+    const x0 = xin - (i - t);
+    const y0 = yin - (j - t);
+    const i1 = x0 > y0 ? 1 : 0;
+    const j1 = x0 > y0 ? 0 : 1;
+    const x1 = x0 - i1 + G2;
+    const y1 = y0 - j1 + G2;
+    const x2 = x0 - 1 + 2 * G2;
+    const y2 = y0 - 1 + 2 * G2;
+    const ii = i & 255;
+    const jj = j & 255;
+    const dot = (gi: number, x: number, y: number) => {
+      const g = grad3[gi % 12];
+      return g[0] * x + g[1] * y;
+    };
+    const gi0 = perm[ii + perm[jj]];
+    const gi1 = perm[ii + i1 + perm[jj + j1]];
+    const gi2 = perm[ii + 1 + perm[jj + 1]];
+    let n0 = 0, n1 = 0, n2 = 0;
+    let t0 = 0.5 - x0 * x0 - y0 * y0;
+    if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(gi0, x0, y0); }
+    let t1 = 0.5 - x1 * x1 - y1 * y1;
+    if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(gi1, x1, y1); }
+    let t2 = 0.5 - x2 * x2 - y2 * y2;
+    if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(gi2, x2, y2); }
+    return 70 * (n0 + n1 + n2); // rango [-1, 1]
+  };
+}
+
+function makeDtInstances(N1: number, N: number): DtInstance[] {
+  const arr: DtInstance[] = [];
+  for (let i = 0; i < N1; i++) {
+    for (let j = 0; j < N; j++) {
+      arr.push({
+        seed: 10 + Math.random() * 990,
+        off: 0.4 + 0.8 * (Math.random() * 2 - 1),
+        di: 120 + Math.random() * 680,
+        i, j,
+      });
+    }
+  }
+  return arr;
+}
+
+/** Superfórmula de Gielis canónica (m dentro de la trigonometría), como en el sketch. */
+function supN(ang: number, m: number, n1: number, n2: number, n3: number): number {
+  const t1 = Math.pow(Math.abs(Math.cos(ang * m / 4)), n2);
+  const t2 = Math.pow(Math.abs(Math.sin(ang * m / 4)), n3);
+  const r = Math.pow(t1 + t2, -1 / n1);
+  return isFinite(r) ? r : 0;
+}
+
+function mapV(v: number, a: number, b: number, c: number, d: number): number {
+  return c + (v - a) / (b - a) * (d - c);
+}
+
+function clampN(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+type Vec3 = [number, number, number];
+
+/** pos(r, p, th): r1 modula X, r2 modula Y (perfiles independientes). */
+function posSerp(r: number, p: number, th: number, cfg: SerpCfg): Vec3 {
+  const r1 = supN(th, cfg.r1[0], cfg.r1[1], cfg.r1[2], cfg.r1[3]);
+  const r2 = supN(th, cfg.r2[0], cfg.r2[1], cfg.r2[2], cfg.r2[3]);
+  const x = r * r1 * Math.cos(th + cfg.trn) - Math.pow(1 - p, 2) * 500 + 200;
+  const y = r * r2 * Math.sin(th + cfg.trn) + 100 * Math.sin(Math.PI * 2 * p);
+  const z = -cfg.Z * (1 - p) + 50 * Math.sin(Math.PI * 2 * p) + 120;
+  return [x, y, z];
+}
+
+function lerpV(a: Vec3, b: Vec3, q: number): Vec3 {
+  return [a[0] + (b[0] - a[0]) * q, a[1] + (b[1] - a[1]) * q, a[2] + (b[2] - a[2]) * q];
+}
+
+/** Reconstruye todos los triángulos (equivale a show() de la clase dt en el sketch). */
+function buildTriangles(
+  instances: DtInstance[], t: number,
+  noise2D: (x: number, y: number) => number,
+  posArr: Float32Array, colArr: Float32Array, cfg: SerpCfg,
+): void {
+  const { R, MV, MXV, N1, N, N2, K } = cfg;
+  const SC = 0.01; // la serpiente vive en cientos de unidades: la traemos a la escala del salón
+  let idx = 0;
+
+  for (const { seed, off, di, i, j } of instances) {
+    for (let k = 0; k < K; k++) {
+      const ind = j + (t + k) * N;
+      const p0 = mapV(ind + 0.5, 0, N2, MV, MXV);
+      const p1 = mapV(ind, 0, N2, MV, MXV);
+      const p2 = mapV(ind + 1, 0, N2, MV, MXV);
+      const th0 = Math.PI * 2 * (i + 0.5) / N1;
+      const th1 = Math.PI * 2 * i / N1;
+      const th2 = Math.PI * 2 * (i + 1) / N1;
+
+      const parVal = Math.pow(1 - clampN(2 * p0 - off, 0, 1), 3.3); // envolvente de vida
+      const rNoise = mapV(noise2D(seed + 2.0 * p0, 0), -1, 1, 0, 1);
+      const rVal = R - 20 - 180 * Math.pow(rNoise, 5);
+      const d = di * parVal;
+      const q = clampN(parVal + 0.05, 0, 1);
+
+      const v0 = posSerp(rVal + d, p0, th0, cfg);
+      const v1 = lerpV(posSerp(R + d, p1, th1, cfg), v0, q);
+      const v2 = lerpV(posSerp(R + d, p2, th1, cfg), v0, q);
+      const v3 = lerpV(posSerp(R + d, p2, th2, cfg), v0, q);
+      const v4 = lerpV(posSerp(R + d, p1, th2, cfg), v0, q);
+
+      const coladd = 900 * Math.pow(mapV(noise2D(2 * seed + 2.5 * p0, 0), -1, 1, 0, 1), 8);
+      const coladd2 = 200 * Math.pow(mapV(noise2D(2 * seed + 9.5 * p0, 0), -1, 1, 0, 1), 6);
+      const bright = clampN((5 + 0.2 * coladd + 0.8 * coladd2 - (1 - p0) * 130) / 255, 0, 1);
+      const cr = bright, cg = bright * 1.05, cb = bright * 0.75;
+
+      const tris: Vec3[][] = [[v0, v1, v2], [v0, v3, v2], [v0, v3, v4], [v0, v1, v4]];
+      for (const tri of tris) {
+        for (const v of tri) {
+          posArr[idx * 3] = v[0] * SC;
+          posArr[idx * 3 + 1] = v[1] * SC;
+          posArr[idx * 3 + 2] = v[2] * SC;
+          colArr[idx * 3] = cr;
+          colArr[idx * 3 + 1] = cg;
+          colArr[idx * 3 + 2] = cb;
+          idx++;
+        }
+      }
+    }
   }
 }
 
@@ -431,5 +698,67 @@ document.body.appendChild(r.domElement);
 const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true;
 const reloj = new THREE.Clock();
 r.setAnimationLoop(()=>{ grupo.rotation.y += P.giro*reloj.getDelta(); ctl.update(); r.render(escena,cam); });
+addEventListener('resize',()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); r.setSize(innerWidth,innerHeight); });
+</script></body></html>`;
+
+const PLANTILLA_SERPIENTE = `<!doctype html>
+<html><head><meta charset="utf-8"><title>MIA — serpiente</title>
+<style>html,body{margin:0;height:100%;background:#060608;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"}}</script>
+</head><body><script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const P = __PARAMS__, SC = 0.01;
+const N1 = Math.round(P.sN1 ?? 30), N = Math.round(P.sN ?? 12), N2 = Math.round(P.sN2 ?? 80), K = Math.ceil(N2/N);
+const R = P.sR ?? 200, Z = P.sZ ?? 1000, TRN = P.sTrn ?? 3.4, MV = P.sMV ?? -0.15, MXV = P.sMXV ?? 1.35;
+const R1 = [P.sr1m??5,P.sr1n1??0.1,P.sr1n2??1.7,P.sr1n3??1.7], R2 = [P.sr2m??7,P.sr2n1??0.3,P.sr2n2??0.5,P.sr2n3??0.5];
+function makeNoise2D(){ const F2=0.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6;
+  const g3=[[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[1,0],[-1,0],[0,1],[0,-1],[0,1],[0,-1]];
+  const pp=Array.from({length:256},(_,i)=>i); for(let i=255;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pp[i],pp[j]]=[pp[j],pp[i]];}
+  const perm=Array.from({length:512},(_,i)=>pp[i&255]);
+  return (xin,yin)=>{ const s=(xin+yin)*F2,i=Math.floor(xin+s),j=Math.floor(yin+s),t=(i+j)*G2;
+    const x0=xin-(i-t),y0=yin-(j-t),i1=x0>y0?1:0,j1=x0>y0?0:1,x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2,ii=i&255,jj=j&255;
+    const dot=(gi,x,y)=>{const g=g3[gi%12];return g[0]*x+g[1]*y;};
+    const gi0=perm[ii+perm[jj]],gi1=perm[ii+i1+perm[jj+j1]],gi2=perm[ii+1+perm[jj+1]];
+    let n0=0,n1=0,n2=0,t0=0.5-x0*x0-y0*y0; if(t0>=0){t0*=t0;n0=t0*t0*dot(gi0,x0,y0);}
+    let t1=0.5-x1*x1-y1*y1; if(t1>=0){t1*=t1;n1=t1*t1*dot(gi1,x1,y1);}
+    let t2=0.5-x2*x2-y2*y2; if(t2>=0){t2*=t2;n2=t2*t2*dot(gi2,x2,y2);}
+    return 70*(n0+n1+n2); };
+}
+const noise2D = makeNoise2D();
+const sup=(a,m,n1,n2,n3)=>{const r=(Math.abs(Math.cos(a*m/4))**n2+Math.abs(Math.sin(a*m/4))**n3)**(-1/n1);return isFinite(r)?r:0;};
+const mapV=(v,a,b,c,d)=>c+(v-a)/(b-a)*(d-c), clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+function pos(r,p,th){ const r1=sup(th,R1[0],R1[1],R1[2],R1[3]),r2=sup(th,R2[0],R2[1],R2[2],R2[3]);
+  return new THREE.Vector3(r*r1*Math.cos(th+TRN)-(1-p)**2*500+200, r*r2*Math.sin(th+TRN)+100*Math.sin(Math.PI*2*p), -Z*(1-p)+50*Math.sin(Math.PI*2*p)+120); }
+const inst=[]; for(let i=0;i<N1;i++)for(let j=0;j<N;j++) inst.push({seed:10+Math.random()*990,off:0.4+0.8*(Math.random()*2-1),di:120+Math.random()*680,i,j});
+const V = N1*N*K*4*3, posArr = new Float32Array(V*3), colArr = new Float32Array(V*3);
+function build(t){ let idx=0;
+  for(const {seed,off,di,i,j} of inst){ for(let k=0;k<K;k++){ const ind=j+(t+k)*N;
+    const p0=mapV(ind+0.5,0,N2,MV,MXV),p1=mapV(ind,0,N2,MV,MXV),p2=mapV(ind+1,0,N2,MV,MXV);
+    const th0=Math.PI*2*(i+0.5)/N1,th1=Math.PI*2*i/N1,th2=Math.PI*2*(i+1)/N1;
+    const par=(1-clamp(2*p0-off,0,1))**3.3, rn=mapV(noise2D(seed+2*p0,0),-1,1,0,1), rV=R-20-180*rn**5, d=di*par, q=clamp(par+0.05,0,1);
+    const v0=pos(rV+d,p0,th0), v1=pos(R+d,p1,th1).lerp(v0,q), v2=pos(R+d,p2,th1).lerp(v0,q), v3=pos(R+d,p2,th2).lerp(v0,q), v4=pos(R+d,p1,th2).lerp(v0,q);
+    const ca=900*mapV(noise2D(2*seed+2.5*p0,0),-1,1,0,1)**8, cb2=200*mapV(noise2D(2*seed+9.5*p0,0),-1,1,0,1)**6;
+    const br=clamp((5+0.2*ca+0.8*cb2-(1-p0)*130)/255,0,1);
+    for(const [a,b,c] of [[v0,v1,v2],[v0,v3,v2],[v0,v3,v4],[v0,v1,v4]]) for(const v of [a,b,c]){
+      posArr[idx*3]=v.x*SC; posArr[idx*3+1]=v.y*SC; posArr[idx*3+2]=v.z*SC;
+      colArr[idx*3]=br; colArr[idx*3+1]=br*1.05; colArr[idx*3+2]=br*0.75; idx++; }
+  }}
+}
+const geo=new THREE.BufferGeometry();
+geo.setAttribute('position',new THREE.BufferAttribute(posArr,3));
+geo.setAttribute('color',new THREE.BufferAttribute(colArr,3));
+const malla=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
+malla.rotation.set(Math.PI*0.9,Math.PI*0.65,0);
+const grupo=new THREE.Group(); grupo.add(malla); grupo.scale.setScalar(P.escala);
+const escena=new THREE.Scene(); escena.add(grupo);
+const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,100); cam.position.z=6;
+const r=new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); r.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.appendChild(r.domElement);
+const ctl=new OrbitControls(cam,r.domElement); ctl.enableDamping=true;
+const reloj=new THREE.Clock(); let t=0;
+r.setAnimationLoop(()=>{ const dt=reloj.getDelta(); t+=dt*(P.velocidad??0.3); build(t);
+  geo.getAttribute('position').needsUpdate=true; geo.getAttribute('color').needsUpdate=true; geo.computeBoundingSphere();
+  grupo.rotation.y += (P.giro??0)*dt; ctl.update(); r.render(escena,cam); });
 addEventListener('resize',()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); r.setSize(innerWidth,innerHeight); });
 </script></body></html>`;
