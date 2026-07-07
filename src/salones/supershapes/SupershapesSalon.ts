@@ -5,18 +5,19 @@
 //   · Serpiente — cuerpo orgánico animado (ruido simplex + envolvente de vida)
 //                 del mismo proyecto supeFlower. r1 en X, r2 en Y (separadas).
 //
-// Cada figura tiene TRES modos de exposición: puntos, alambre y caras,
-// más resolución variable y color — los atributos que heredan las fichas.
+// Cada figura tiene TRES modos de exposición: puntos, alambre y caras.
+// Clásica/SuperFlor comparten la resolución global; Serpiente tiene su
+// propia densidad por aros/gajos/longitud.
 //
 // ★ GPU: Clásica y SuperFlor son retículas (u,v) estáticas evaluadas en el
 //   vertex/fragment shader desde uniforms; solo la RESOLUCIÓN regenera el grid.
-// ★ CPU: la Serpiente es geometría reconstruida cada frame (ruido + azar por
-//   instancia + scroll temporal), fiel al sketch original de Processing.
+// ★ GPU: la Serpiente hornea identidad por vértice y evalúa posición/color en
+//   shaders desde uniforms, ruido y atributos estáticos.
 
 import * as THREE from 'three/webgpu';
 import {
   Fn, uniform, float, vec3, vec4, uv, mix, abs, sin, cos, exp, max,
-  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute,
+  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute, mx_noise_float,
 } from 'three/tsl';
 import type { Salon, Params, ParamDef, Pestana } from '../../core/Salon';
 
@@ -30,7 +31,7 @@ export class SupershapesSalon implements Salon {
   params: ParamDef[] = [
     { clave: 'escala',     etiqueta: 'escala',     valor: 2,    min: 0.2, max: 5 },
     { clave: 'giro',       etiqueta: 'giro',       valor: 0.15, min: -2,  max: 2 },
-    { clave: 'resolucion', etiqueta: 'resolución', valor: 256,  min: 8,   max: 512, paso: 8 },
+    { clave: 'resolucion', etiqueta: 'resolución superficies', valor: 256,  min: 8,   max: 512, paso: 8 },
     { clave: 'vista',      etiqueta: 'exposición', valor: 0,    min: 0,   max: 2, opciones: VISTA },
     { clave: 'color',      etiqueta: 'color',      valor: 0xdfe6ff, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'puntoTam',   etiqueta: 'tamaño punto (WebGL)', valor: 0.02, min: 0.001, max: 0.1 },
@@ -131,6 +132,15 @@ export class SupershapesSalon implements Salon {
     r2m: uniform(7), r2n1: uniform(0.2), r2n2: uniform(1.7), r2n3: uniform(1.7),
     zOffset: uniform(120), zCurva: uniform(900), xOffset: uniform(120), yOffset: uniform(200), yBase: uniform(40),
   };
+  // Serpiente: mismo modelo GPU que las demás. La geometría es estática (identidad
+  // por vértice horneada en atributos); todo se evalúa en el shader desde estos uniforms.
+  private uS = {
+    fase: uniform(0), R: uniform(200), Z: uniform(1000), trn: uniform(3.4),
+    MV: uniform(-0.15), MXV: uniform(1.35),
+    N1: uniform(30), N: uniform(12), N2: uniform(80),
+    r1m: uniform(5), r1n1: uniform(0.1), r1n2: uniform(1.7), r1n3: uniform(1.7),
+    r2m: uniform(7), r2n1: uniform(0.3), r2n2: uniform(0.5), r2n3: uniform(0.5),
+  };
   private uColor = uniform(new THREE.Color(0xdfe6ff));
 
   private grupo = new THREE.Group();
@@ -141,15 +151,10 @@ export class SupershapesSalon implements Salon {
   private geoF: THREE.BufferGeometry | null = null;
   private resActual = 0;
 
-  // — Serpiente: geometría CPU animada (no usa positionNode) —
+  // — Serpiente: geometría GPU. Solo el conteo (N1/N/N2) regenera atributos. —
   private objS: { puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh } | null = null;
   private geoS: THREE.BufferGeometry | null = null;
-  private posS: Float32Array | null = null;
-  private colS: Float32Array | null = null;
-  private noise2D = makeNoise2D();
-  private instS: DtInstance[] = [];
   private serpCounts = { N1: 0, N: 0, N2: 0 };
-  private serpFirma = ''; // evita reconstruir la malla si nada cambió (congelada = estática)
 
   init(escena: THREE.Scene): void {
     this.objC = this.crearRepresentaciones(this.nodoPosClasica(), this.nodoColorClasica());
@@ -158,23 +163,27 @@ export class SupershapesSalon implements Salon {
     this.objS = this.crearSerpiente();
     for (const o of [this.objS.puntos, this.objS.alambre, this.objS.caras]) {
       o.rotation.set(Math.PI * 0.9, Math.PI * 0.65, 0);
+      o.frustumCulled = false; // las posiciones vienen del shader: la cota CPU no las conoce
     }
+    this.regenerarSerpiente(30, 12, 80); // hornea atributos iniciales (semillas aleatorias)
     for (const o of [this.objC, this.objF, this.objS]) this.grupo.add(o.puntos, o.alambre, o.caras);
     escena.add(this.grupo);
     this.resActual = 0; // fuerza regeneración de retícula en el primer update
   }
 
   update(dt: number, _t: number, p: Params): void {
-    // — Retícula: solo se regenera si cambió la resolución —
+    // — Visibilidad: figura activa (pestaña) × modo de exposición —
+    const modo = p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
+    const vista = p.vista === 1 ? 1 : p.vista === 2 ? 2 : 0;
+
+    // — Retícula de Clásica/SuperFlor: solo se regenera si su resolución cambió.
+    // Serpiente usa sN1/sN/sN2, así que no paga este coste mientras está activa.
     const res = Math.max(8, Math.round(p.resolucion ?? 256));
-    if (res !== this.resActual) {
+    if (modo !== 2 && res !== this.resActual) {
       this.resActual = res;
       this.regenerarReticulas(res);
     }
 
-    // — Visibilidad: figura activa (pestaña) × modo de exposición —
-    const modo = p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
-    const vista = p.vista === 1 ? 1 : p.vista === 2 ? 2 : 0;
     const aplicar = (o: typeof this.objC, activa: boolean) => {
       if (!o) return;
       o.puntos.visible = activa && vista === VISTA.Puntos;
@@ -185,7 +194,7 @@ export class SupershapesSalon implements Salon {
     aplicar(this.objF, modo === 1);
     aplicar(this.objS, modo === 2);
 
-    // — Serpiente: solo se reconstruye (CPU) mientras su pestaña está activa —
+    // — Serpiente: solo actualiza uniforms y, si cambió el conteo, atributos estáticos —
     if (modo === 2) this.actualizarSerpiente(p);
 
     // — Uniforms —
@@ -224,8 +233,7 @@ export class SupershapesSalon implements Salon {
       (o.caras.material as THREE.Material).dispose();
     }
     this.objC = this.objF = this.objS = null;
-    this.geoS = this.posS = this.colS = null;
-    this.instS = [];
+    this.geoS = null;
     this.grupo.clear();
   }
 
@@ -262,19 +270,23 @@ export class SupershapesSalon implements Salon {
     if (this.objF) this.objF.puntos.geometry = this.objF.alambre.geometry = this.objF.caras.geometry = this.geoF;
   }
 
-  // ————— Serpiente (CPU animada) —————
+  // ————— Serpiente (GPU animada) —————
 
   private crearSerpiente() {
     const geo = new THREE.BufferGeometry(); // se dimensiona en regenerarSerpiente
+    const pos = this.nodoPosSerp();
 
     const matPuntos = new THREE.PointsNodeMaterial();
+    matPuntos.positionNode = pos;
     matPuntos.colorNode = this.uColor;
 
     const matAlambre = new THREE.MeshBasicNodeMaterial({ wireframe: true, transparent: true, opacity: 0.5 });
+    matAlambre.positionNode = pos;
     matAlambre.colorNode = this.uColor;
 
     const matCaras = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
-    matCaras.colorNode = attribute('color', 'vec3').mul(this.uColor); // color por vértice × tinte del panel
+    matCaras.positionNode = pos;
+    matCaras.colorNode = this.nodoColorSerp();
 
     return {
       puntos: new THREE.Points(geo, matPuntos),
@@ -283,21 +295,48 @@ export class SupershapesSalon implements Salon {
     };
   }
 
+  /**
+   * Hornea la IDENTIDAD de cada vértice (instancia i,j · segmento k · esquina · semilla).
+   * Es lo único estático: como la retícula de la flor, solo se rehace al cambiar el conteo.
+   * Las posiciones NO se guardan aquí — las calcula el shader desde `fase` y los uniforms.
+   * Semillas aleatorias por instancia → variación orgánica nueva en cada regeneración/montaje.
+   */
   private regenerarSerpiente(N1: number, N: number, N2: number): void {
     const K = Math.ceil(N2 / N);
     const verts = N1 * N * K * 4 * 3; // instancias × K × 4 triángulos × 3 vértices
     this.geoS?.dispose();
-    this.posS = new Float32Array(verts * 3);
-    this.colS = new Float32Array(verts * 3);
+    const position = new Float32Array(verts * 3); // dummy: positionNode lo sobreescribe
+    const aIJK = new Float32Array(verts * 3);     // (i, j, k)
+    const aInst = new Float32Array(verts * 4);    // (esquina 0..4, seed, off, di)
+    const TRI = [[0, 1, 2], [0, 3, 2], [0, 3, 4], [0, 1, 4]]; // índices de v0..v4 por triángulo
+    let vi = 0;
+    for (let i = 0; i < N1; i++) {
+      for (let j = 0; j < N; j++) {
+        const seed = 10 + Math.random() * 990;
+        const off = 0.4 + 0.8 * (Math.random() * 2 - 1);
+        const di = 120 + Math.random() * 680;
+        for (let k = 0; k < K; k++) {
+          for (const tri of TRI) {
+            for (const esquina of tri) {
+              aIJK[vi * 3] = i; aIJK[vi * 3 + 1] = j; aIJK[vi * 3 + 2] = k;
+              aInst[vi * 4] = esquina; aInst[vi * 4 + 1] = seed; aInst[vi * 4 + 2] = off; aInst[vi * 4 + 3] = di;
+              vi++;
+            }
+          }
+        }
+      }
+    }
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(this.posS, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(this.colS, 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+    geo.setAttribute('aIJK', new THREE.BufferAttribute(aIJK, 3));
+    geo.setAttribute('aInst', new THREE.BufferAttribute(aInst, 4));
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20); // el shader mueve todo: cota amplia
     this.geoS = geo;
     if (this.objS) this.objS.puntos.geometry = this.objS.alambre.geometry = this.objS.caras.geometry = geo;
-    this.instS = makeDtInstances(N1, N); // semillas/azar por instancia: se recalculan al cambiar el conteo
     this.serpCounts = { N1, N, N2 };
   }
 
+  /** Un tick: solo mueve uniforms (incluida `fase`). Sin reconstrucción de geometría. */
   private actualizarSerpiente(p: Params): void {
     const N1 = Math.max(6, Math.round(p.sN1 ?? 30));
     const N = Math.max(3, Math.round(p.sN ?? 12));
@@ -305,24 +344,89 @@ export class SupershapesSalon implements Salon {
     if (N1 !== this.serpCounts.N1 || N !== this.serpCounts.N || N2 !== this.serpCounts.N2) {
       this.regenerarSerpiente(N1, N, N2);
     }
-    // El scroll viene de la BASE `fase` (0 = congelada mientras modelas). El salón
-    // NO tiene reloj propio: en el Escenario cada actor avanzará su fase (hidratación).
-    const t = p.fase ?? 0;
-    const cfg: SerpCfg = {
-      R: p.sR ?? 200, Z: p.sZ ?? 1000, trn: p.sTrn ?? 3.4,
-      MV: p.sMV ?? -0.15, MXV: p.sMXV ?? 1.35,
-      N1, N, N2, K: Math.ceil(N2 / N),
-      r1: [p.sr1m ?? 5, p.sr1n1 ?? 0.1, p.sr1n2 ?? 1.7, p.sr1n3 ?? 1.7],
-      r2: [p.sr2m ?? 7, p.sr2n1 ?? 0.3, p.sr2n2 ?? 0.5, p.sr2n3 ?? 0.5],
-    };
-    // Congelada + parámetros sin tocar → no reconstruimos (malla estática, sin gasto CPU).
-    const firma = `${t}|${N1},${N},${N2}|${cfg.R},${cfg.Z},${cfg.trn},${cfg.MV},${cfg.MXV}|${cfg.r1}|${cfg.r2}`;
-    if (firma === this.serpFirma && this.geoS) return;
-    this.serpFirma = firma;
-    buildTriangles(this.instS, t, this.noise2D, this.posS!, this.colS!, cfg);
-    (this.geoS!.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-    (this.geoS!.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
-    this.geoS!.computeBoundingSphere();
+    const u = this.uS;
+    // `fase` = reloj del scroll. Base 0 → congelada al modelar; el Escenario la avanza por actor.
+    u.fase.value = p.fase ?? 0;
+    u.R.value = p.sR ?? 200; u.Z.value = p.sZ ?? 1000; u.trn.value = p.sTrn ?? 3.4;
+    u.MV.value = p.sMV ?? -0.15; u.MXV.value = p.sMXV ?? 1.35;
+    u.N1.value = N1; u.N.value = N; u.N2.value = N2;
+    u.r1m.value = p.sr1m ?? 5; u.r1n1.value = p.sr1n1 ?? 0.1; u.r1n2.value = p.sr1n2 ?? 1.7; u.r1n3.value = p.sr1n3 ?? 1.7;
+    u.r2m.value = p.sr2m ?? 7; u.r2n1.value = p.sr2n1 ?? 0.3; u.r2n2.value = p.sr2n2 ?? 0.5; u.r2n3.value = p.sr2n3 ?? 0.5;
+  }
+
+  // ————— Grafos TSL de la Serpiente —————
+
+  /** Ruido suave GPU en [0,1] a lo largo de una recta (equivale al simplex por semilla del sketch). */
+  private snoise01(x: any): any {
+    return clamp(mx_noise_float(vec3(x, 0, 0)).mul(0.5).add(0.5), 0, 1);
+  }
+
+  /** pos(r, p, th): r1 modula X, r2 modula Y (perfiles Gielis independientes). */
+  private posSerp(r: any, p: any, th: any): any {
+    const u = this.uS;
+    const r1 = this.sr(th, u.r1m, u.r1n1, u.r1n2, u.r1n3);
+    const r2 = this.sr(th, u.r2m, u.r2n1, u.r2n2, u.r2n3);
+    const ang = th.add(u.trn);
+    const twoPiP = p.mul(2 * PI);
+    const x = r.mul(r1).mul(cos(ang)).sub(float(1).sub(p).pow(2).mul(500)).add(200);
+    const y = r.mul(r2).mul(sin(ang)).add(sin(twoPiP).mul(100));
+    const z = u.Z.negate().mul(float(1).sub(p)).add(sin(twoPiP).mul(50)).add(120);
+    return vec3(x, y, z);
+  }
+
+  private nodoPosSerp(): any {
+    const u = this.uS;
+    return Fn(() => {
+      const ijk = attribute('aIJK', 'vec3');
+      const inst = attribute('aInst', 'vec4');
+      const i = ijk.x, j = ijk.y, k = ijk.z;
+      const esquina = inst.x, seed = inst.y, off = inst.z, di = inst.w;
+
+      const ind = j.add(u.fase.add(k).mul(u.N));
+      const map = (v: any) => u.MV.add(v.div(u.N2).mul(u.MXV.sub(u.MV))); // mapV(v,0,N2,MV,MXV)
+      const p0 = map(ind.add(0.5)), p1 = map(ind), p2 = map(ind.add(1));
+      const th0 = i.add(0.5).mul(2 * PI).div(u.N1);
+      const th1 = i.mul(2 * PI).div(u.N1);
+      const th2 = i.add(1).mul(2 * PI).div(u.N1);
+
+      // Magnitudes compartidas por los 5 vértices (dependen del centro p0):
+      const parVal = float(1).sub(clamp(p0.mul(2).sub(off), 0, 1)).pow(3.3); // envolvente de vida
+      const rVal = u.R.sub(20).sub(this.snoise01(seed.add(p0.mul(2))).pow(5).mul(180));
+      const d = di.mul(parVal);
+      const q = clamp(parVal.add(0.05), 0, 1);
+
+      const v0 = this.posSerp(rVal.add(d), p0, th0); // centro (radio con ruido)
+
+      // p, th y radio de ESTE vértice según su esquina (0→v0, 1→v1 … 4→v4):
+      const c = esquina;
+      const pV = select(c.lessThan(0.5), p0,
+        select(c.lessThan(1.5), p1, select(c.lessThan(2.5), p2, select(c.lessThan(3.5), p2, p1))));
+      const thV = select(c.lessThan(0.5), th0,
+        select(c.lessThan(1.5), th1, select(c.lessThan(2.5), th1, th2)));
+      const rV = select(c.lessThan(0.5), rVal.add(d), u.R.add(d));
+      const propio = this.posSerp(rV, pV, thV);
+
+      // v0 es el centro; los del borde se atraen hacia v0 por q (colapso de la envolvente).
+      const fin = select(c.lessThan(0.5), v0, mix(propio, v0, q));
+      return fin.mul(0.01); // la serpiente vive en cientos de unidades
+    })();
+  }
+
+  private nodoColorSerp(): any {
+    const u = this.uS;
+    return Fn(() => {
+      const ijk = attribute('aIJK', 'vec3');
+      const inst = attribute('aInst', 'vec4');
+      const j = ijk.y, k = ijk.z, seed = inst.y;
+      const ind = j.add(u.fase.add(k).mul(u.N));
+      const p0 = u.MV.add(ind.add(0.5).div(u.N2).mul(u.MXV.sub(u.MV)));
+      const coladd = this.snoise01(seed.mul(2).add(p0.mul(2.5))).pow(8).mul(900);
+      const coladd2 = this.snoise01(seed.mul(2).add(p0.mul(9.5))).pow(6).mul(200);
+      const bright = clamp(
+        float(5).add(coladd.mul(0.2)).add(coladd2.mul(0.8)).sub(float(1).sub(p0).mul(130)).div(255),
+        0, 1);
+      return vec3(bright, bright.mul(1.05), bright.mul(0.75)).mul(this.uColor);
+    })();
   }
 
   // ————— Grafos TSL —————
@@ -461,166 +565,6 @@ export class SupershapesSalon implements Salon {
       .replaceAll('__RES__', '128')
       .replaceAll('__N1__', '60')
       .replaceAll('__N2__', '28');
-  }
-}
-
-// ————— Serpiente: helpers CPU (port de supeFlower/Serpiente.tsx) —————
-
-interface DtInstance { seed: number; off: number; di: number; i: number; j: number }
-
-interface SerpCfg {
-  R: number; Z: number; trn: number; MV: number; MXV: number;
-  N1: number; N: number; N2: number; K: number;
-  r1: [number, number, number, number];
-  r2: [number, number, number, number];
-}
-
-/** Ruido simplex 2D inline (equivalente al OpenSimplexNoise del sketch original). */
-function makeNoise2D(): (x: number, y: number) => number {
-  const F2 = 0.5 * (Math.sqrt(3) - 1);
-  const G2 = (3 - Math.sqrt(3)) / 6;
-  const grad3 = [
-    [1, 1], [-1, 1], [1, -1], [-1, -1],
-    [1, 0], [-1, 0], [1, 0], [-1, 0],
-    [0, 1], [0, -1], [0, 1], [0, -1],
-  ];
-  const p = Array.from({ length: 256 }, (_, i) => i);
-  for (let i = 255; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [p[i], p[j]] = [p[j], p[i]];
-  }
-  const perm = Array.from({ length: 512 }, (_, i) => p[i & 255]);
-
-  return function noise2D(xin: number, yin: number): number {
-    const s = (xin + yin) * F2;
-    const i = Math.floor(xin + s);
-    const j = Math.floor(yin + s);
-    const t = (i + j) * G2;
-    const x0 = xin - (i - t);
-    const y0 = yin - (j - t);
-    const i1 = x0 > y0 ? 1 : 0;
-    const j1 = x0 > y0 ? 0 : 1;
-    const x1 = x0 - i1 + G2;
-    const y1 = y0 - j1 + G2;
-    const x2 = x0 - 1 + 2 * G2;
-    const y2 = y0 - 1 + 2 * G2;
-    const ii = i & 255;
-    const jj = j & 255;
-    const dot = (gi: number, x: number, y: number) => {
-      const g = grad3[gi % 12];
-      return g[0] * x + g[1] * y;
-    };
-    const gi0 = perm[ii + perm[jj]];
-    const gi1 = perm[ii + i1 + perm[jj + j1]];
-    const gi2 = perm[ii + 1 + perm[jj + 1]];
-    let n0 = 0, n1 = 0, n2 = 0;
-    let t0 = 0.5 - x0 * x0 - y0 * y0;
-    if (t0 >= 0) { t0 *= t0; n0 = t0 * t0 * dot(gi0, x0, y0); }
-    let t1 = 0.5 - x1 * x1 - y1 * y1;
-    if (t1 >= 0) { t1 *= t1; n1 = t1 * t1 * dot(gi1, x1, y1); }
-    let t2 = 0.5 - x2 * x2 - y2 * y2;
-    if (t2 >= 0) { t2 *= t2; n2 = t2 * t2 * dot(gi2, x2, y2); }
-    return 70 * (n0 + n1 + n2); // rango [-1, 1]
-  };
-}
-
-function makeDtInstances(N1: number, N: number): DtInstance[] {
-  const arr: DtInstance[] = [];
-  for (let i = 0; i < N1; i++) {
-    for (let j = 0; j < N; j++) {
-      arr.push({
-        seed: 10 + Math.random() * 990,
-        off: 0.4 + 0.8 * (Math.random() * 2 - 1),
-        di: 120 + Math.random() * 680,
-        i, j,
-      });
-    }
-  }
-  return arr;
-}
-
-/** Superfórmula de Gielis canónica (m dentro de la trigonometría), como en el sketch. */
-function supN(ang: number, m: number, n1: number, n2: number, n3: number): number {
-  const t1 = Math.pow(Math.abs(Math.cos(ang * m / 4)), n2);
-  const t2 = Math.pow(Math.abs(Math.sin(ang * m / 4)), n3);
-  const r = Math.pow(t1 + t2, -1 / n1);
-  return isFinite(r) ? r : 0;
-}
-
-function mapV(v: number, a: number, b: number, c: number, d: number): number {
-  return c + (v - a) / (b - a) * (d - c);
-}
-
-function clampN(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
-
-type Vec3 = [number, number, number];
-
-/** pos(r, p, th): r1 modula X, r2 modula Y (perfiles independientes). */
-function posSerp(r: number, p: number, th: number, cfg: SerpCfg): Vec3 {
-  const r1 = supN(th, cfg.r1[0], cfg.r1[1], cfg.r1[2], cfg.r1[3]);
-  const r2 = supN(th, cfg.r2[0], cfg.r2[1], cfg.r2[2], cfg.r2[3]);
-  const x = r * r1 * Math.cos(th + cfg.trn) - Math.pow(1 - p, 2) * 500 + 200;
-  const y = r * r2 * Math.sin(th + cfg.trn) + 100 * Math.sin(Math.PI * 2 * p);
-  const z = -cfg.Z * (1 - p) + 50 * Math.sin(Math.PI * 2 * p) + 120;
-  return [x, y, z];
-}
-
-function lerpV(a: Vec3, b: Vec3, q: number): Vec3 {
-  return [a[0] + (b[0] - a[0]) * q, a[1] + (b[1] - a[1]) * q, a[2] + (b[2] - a[2]) * q];
-}
-
-/** Reconstruye todos los triángulos (equivale a show() de la clase dt en el sketch). */
-function buildTriangles(
-  instances: DtInstance[], t: number,
-  noise2D: (x: number, y: number) => number,
-  posArr: Float32Array, colArr: Float32Array, cfg: SerpCfg,
-): void {
-  const { R, MV, MXV, N1, N, N2, K } = cfg;
-  const SC = 0.01; // la serpiente vive en cientos de unidades: la traemos a la escala del salón
-  let idx = 0;
-
-  for (const { seed, off, di, i, j } of instances) {
-    for (let k = 0; k < K; k++) {
-      const ind = j + (t + k) * N;
-      const p0 = mapV(ind + 0.5, 0, N2, MV, MXV);
-      const p1 = mapV(ind, 0, N2, MV, MXV);
-      const p2 = mapV(ind + 1, 0, N2, MV, MXV);
-      const th0 = Math.PI * 2 * (i + 0.5) / N1;
-      const th1 = Math.PI * 2 * i / N1;
-      const th2 = Math.PI * 2 * (i + 1) / N1;
-
-      const parVal = Math.pow(1 - clampN(2 * p0 - off, 0, 1), 3.3); // envolvente de vida
-      const rNoise = mapV(noise2D(seed + 2.0 * p0, 0), -1, 1, 0, 1);
-      const rVal = R - 20 - 180 * Math.pow(rNoise, 5);
-      const d = di * parVal;
-      const q = clampN(parVal + 0.05, 0, 1);
-
-      const v0 = posSerp(rVal + d, p0, th0, cfg);
-      const v1 = lerpV(posSerp(R + d, p1, th1, cfg), v0, q);
-      const v2 = lerpV(posSerp(R + d, p2, th1, cfg), v0, q);
-      const v3 = lerpV(posSerp(R + d, p2, th2, cfg), v0, q);
-      const v4 = lerpV(posSerp(R + d, p1, th2, cfg), v0, q);
-
-      const coladd = 900 * Math.pow(mapV(noise2D(2 * seed + 2.5 * p0, 0), -1, 1, 0, 1), 8);
-      const coladd2 = 200 * Math.pow(mapV(noise2D(2 * seed + 9.5 * p0, 0), -1, 1, 0, 1), 6);
-      const bright = clampN((5 + 0.2 * coladd + 0.8 * coladd2 - (1 - p0) * 130) / 255, 0, 1);
-      const cr = bright, cg = bright * 1.05, cb = bright * 0.75;
-
-      const tris: Vec3[][] = [[v0, v1, v2], [v0, v3, v2], [v0, v3, v4], [v0, v1, v4]];
-      for (const tri of tris) {
-        for (const v of tri) {
-          posArr[idx * 3] = v[0] * SC;
-          posArr[idx * 3 + 1] = v[1] * SC;
-          posArr[idx * 3 + 2] = v[2] * SC;
-          colArr[idx * 3] = cr;
-          colArr[idx * 3 + 1] = cg;
-          colArr[idx * 3 + 2] = cb;
-          idx++;
-        }
-      }
-    }
   }
 }
 
