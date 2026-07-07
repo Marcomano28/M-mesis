@@ -5,9 +5,8 @@
 //   · Serpiente — cuerpo orgánico animado (ruido simplex + envolvente de vida)
 //                 del mismo proyecto supeFlower. r1 en X, r2 en Y (separadas).
 //
-// Cada figura tiene TRES modos de exposición: puntos, alambre y caras.
-// Clásica/SuperFlor comparten la resolución global; Serpiente tiene su
-// propia densidad por aros/gajos/longitud.
+// Cada figura tiene TRES modos de exposición: puntos, alambre y caras,
+// más resolución variable y color — los atributos que heredan las fichas.
 //
 // ★ GPU: Clásica y SuperFlor son retículas (u,v) estáticas evaluadas en el
 //   vertex/fragment shader desde uniforms; solo la RESOLUCIÓN regenera el grid.
@@ -31,7 +30,7 @@ export class SupershapesSalon implements Salon {
   params: ParamDef[] = [
     { clave: 'escala',     etiqueta: 'escala',     valor: 2,    min: 0.2, max: 5 },
     { clave: 'giro',       etiqueta: 'giro',       valor: 0.15, min: -2,  max: 2 },
-    { clave: 'resolucion', etiqueta: 'resolución superficies', valor: 256,  min: 8,   max: 512, paso: 8 },
+    { clave: 'resolucion', etiqueta: 'resolución', valor: 256,  min: 8,   max: 512, paso: 8 },
     { clave: 'vista',      etiqueta: 'exposición', valor: 0,    min: 0,   max: 2, opciones: VISTA },
     { clave: 'color',      etiqueta: 'color',      valor: 0xdfe6ff, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'puntoTam',   etiqueta: 'tamaño punto (WebGL)', valor: 0.02, min: 0.001, max: 0.1 },
@@ -101,10 +100,6 @@ export class SupershapesSalon implements Salon {
         { clave: 'sTrn',      etiqueta: 'giro perfil',     valor: 3.4,   min: 0,   max: 6.283 },
         { clave: 'sMV',       etiqueta: 'vida desde',      valor: -0.15, min: -1,  max: 0 },
         { clave: 'sMXV',      etiqueta: 'vida hasta',      valor: 1.35,  min: 0.5, max: 2 },
-        // — Retícula de instancias (recrea buffers al cambiar) —
-        { clave: 'sN1',       etiqueta: 'aros (N1)',       valor: 30,    min: 6,   max: 60,  paso: 1 },
-        { clave: 'sN',        etiqueta: 'gajos (N)',       valor: 12,    min: 3,   max: 24,  paso: 1 },
-        { clave: 'sN2',       etiqueta: 'longitud (N2)',   valor: 80,    min: 20,  max: 160, paso: 1 },
         // — Perfil r1 (eje X) —
         { clave: 'sr1m',  etiqueta: 'r1 · m',  valor: 5,   min: 1,    max: 20, paso: 1 },
         { clave: 'sr1n1', etiqueta: 'r1 · n1', valor: 0.1, min: 0.01, max: 5 },
@@ -151,7 +146,7 @@ export class SupershapesSalon implements Salon {
   private geoF: THREE.BufferGeometry | null = null;
   private resActual = 0;
 
-  // — Serpiente: geometría GPU. Solo el conteo (N1/N/N2) regenera atributos. —
+  // — Serpiente: geometría GPU. Solo el conteo derivado de resolución regenera atributos. —
   private objS: { puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh } | null = null;
   private geoS: THREE.BufferGeometry | null = null;
   private serpCounts = { N1: 0, N: 0, N2: 0 };
@@ -165,7 +160,7 @@ export class SupershapesSalon implements Salon {
       o.rotation.set(Math.PI * 0.9, Math.PI * 0.65, 0);
       o.frustumCulled = false; // las posiciones vienen del shader: la cota CPU no las conoce
     }
-    this.regenerarSerpiente(30, 12, 80); // hornea atributos iniciales (semillas aleatorias)
+    this.regenerarSerpiente(...this.conteosSerpiente(256)); // hornea atributos iniciales (semillas aleatorias)
     for (const o of [this.objC, this.objF, this.objS]) this.grupo.add(o.puntos, o.alambre, o.caras);
     escena.add(this.grupo);
     this.resActual = 0; // fuerza regeneración de retícula en el primer update
@@ -177,7 +172,7 @@ export class SupershapesSalon implements Salon {
     const vista = p.vista === 1 ? 1 : p.vista === 2 ? 2 : 0;
 
     // — Retícula de Clásica/SuperFlor: solo se regenera si su resolución cambió.
-    // Serpiente usa sN1/sN/sN2, así que no paga este coste mientras está activa.
+    // Serpiente usa la misma resolución, pero con una topología propia.
     const res = Math.max(8, Math.round(p.resolucion ?? 256));
     if (modo !== 2 && res !== this.resActual) {
       this.resActual = res;
@@ -194,8 +189,8 @@ export class SupershapesSalon implements Salon {
     aplicar(this.objF, modo === 1);
     aplicar(this.objS, modo === 2);
 
-    // — Serpiente: solo actualiza uniforms y, si cambió el conteo, atributos estáticos —
-    if (modo === 2) this.actualizarSerpiente(p);
+    // — Serpiente: solo actualiza uniforms y, si cambió la resolución, atributos estáticos —
+    if (modo === 2) this.actualizarSerpiente(p, res);
 
     // — Uniforms —
     const c = this.uC;
@@ -336,11 +331,17 @@ export class SupershapesSalon implements Salon {
     this.serpCounts = { N1, N, N2 };
   }
 
+  private conteosSerpiente(res: number): [number, number, number] {
+    const k = Math.max(8, res) / 256;
+    const N1 = Math.max(6, Math.min(60, Math.round(30 * k)));
+    const N = Math.max(3, Math.min(24, Math.round(12 * k)));
+    const N2 = Math.max(20, Math.min(160, Math.round(80 * k)));
+    return [N1, N, N2];
+  }
+
   /** Un tick: solo mueve uniforms (incluida `fase`). Sin reconstrucción de geometría. */
-  private actualizarSerpiente(p: Params): void {
-    const N1 = Math.max(6, Math.round(p.sN1 ?? 30));
-    const N = Math.max(3, Math.round(p.sN ?? 12));
-    const N2 = Math.max(20, Math.round(p.sN2 ?? 80));
+  private actualizarSerpiente(p: Params, res: number): void {
+    const [N1, N, N2] = this.conteosSerpiente(res);
     if (N1 !== this.serpCounts.N1 || N !== this.serpCounts.N || N2 !== this.serpCounts.N2) {
       this.regenerarSerpiente(N1, N, N2);
     }
@@ -662,7 +663,11 @@ const PLANTILLA_SERPIENTE = `<!doctype html>
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const P = __PARAMS__, SC = 0.01;
-const N1 = Math.round(P.sN1 ?? 30), N = Math.round(P.sN ?? 12), N2 = Math.round(P.sN2 ?? 80), K = Math.ceil(N2/N);
+const RES = Math.max(8, Math.round(P.resolucion ?? 256)), KR = RES / 256;
+const N1 = Math.max(6, Math.min(60, Math.round(30 * KR)));
+const N = Math.max(3, Math.min(24, Math.round(12 * KR)));
+const N2 = Math.max(20, Math.min(160, Math.round(80 * KR)));
+const K = Math.ceil(N2/N);
 const R = P.sR ?? 200, Z = P.sZ ?? 1000, TRN = P.sTrn ?? 3.4, MV = P.sMV ?? -0.15, MXV = P.sMXV ?? 1.35;
 const R1 = [P.sr1m??5,P.sr1n1??0.1,P.sr1n2??1.7,P.sr1n3??1.7], R2 = [P.sr2m??7,P.sr2n1??0.3,P.sr2n2??0.5,P.sr2n3??0.5];
 function makeNoise2D(){ const F2=0.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6;
