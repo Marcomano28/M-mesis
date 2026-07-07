@@ -91,7 +91,10 @@ export class SupershapesSalon implements Salon {
     {
       titulo: 'Serpiente',
       params: [
-        { clave: 'velocidad', etiqueta: 'velocidad',      valor: 0.3,   min: 0,   max: 2 },
+        // fase = reloj del scroll. Base 0 → congelada mientras modelas (slider = posar).
+        // En el Escenario cada actor avanza su propia fase (hidratación en escena).
+        { clave: 'fase',      etiqueta: 'fase (posar)',    valor: 0,     min: 0,   max: 20 },
+        { clave: 'velocidad', etiqueta: 'velocidad (escena)', valor: 0.3, min: 0,  max: 2 },
         { clave: 'sR',        etiqueta: 'radio (R)',       valor: 200,   min: 50,  max: 400,  paso: 1 },
         { clave: 'sZ',        etiqueta: 'largo (Z)',       valor: 1000,  min: 200, max: 2000, paso: 10 },
         { clave: 'sTrn',      etiqueta: 'giro perfil',     valor: 3.4,   min: 0,   max: 6.283 },
@@ -145,8 +148,8 @@ export class SupershapesSalon implements Salon {
   private colS: Float32Array | null = null;
   private noise2D = makeNoise2D();
   private instS: DtInstance[] = [];
-  private tSerp = 0;
   private serpCounts = { N1: 0, N: 0, N2: 0 };
+  private serpFirma = ''; // evita reconstruir la malla si nada cambió (congelada = estática)
 
   init(escena: THREE.Scene): void {
     this.objC = this.crearRepresentaciones(this.nodoPosClasica(), this.nodoColorClasica());
@@ -183,7 +186,7 @@ export class SupershapesSalon implements Salon {
     aplicar(this.objS, modo === 2);
 
     // — Serpiente: solo se reconstruye (CPU) mientras su pestaña está activa —
-    if (modo === 2) this.actualizarSerpiente(dt, p);
+    if (modo === 2) this.actualizarSerpiente(p);
 
     // — Uniforms —
     const c = this.uC;
@@ -295,14 +298,16 @@ export class SupershapesSalon implements Salon {
     this.serpCounts = { N1, N, N2 };
   }
 
-  private actualizarSerpiente(dt: number, p: Params): void {
+  private actualizarSerpiente(p: Params): void {
     const N1 = Math.max(6, Math.round(p.sN1 ?? 30));
     const N = Math.max(3, Math.round(p.sN ?? 12));
     const N2 = Math.max(20, Math.round(p.sN2 ?? 80));
     if (N1 !== this.serpCounts.N1 || N !== this.serpCounts.N || N2 !== this.serpCounts.N2) {
       this.regenerarSerpiente(N1, N, N2);
     }
-    this.tSerp += dt * (p.velocidad ?? 0.3);
+    // El scroll viene de la BASE `fase` (0 = congelada mientras modelas). El salón
+    // NO tiene reloj propio: en el Escenario cada actor avanzará su fase (hidratación).
+    const t = p.fase ?? 0;
     const cfg: SerpCfg = {
       R: p.sR ?? 200, Z: p.sZ ?? 1000, trn: p.sTrn ?? 3.4,
       MV: p.sMV ?? -0.15, MXV: p.sMXV ?? 1.35,
@@ -310,7 +315,11 @@ export class SupershapesSalon implements Salon {
       r1: [p.sr1m ?? 5, p.sr1n1 ?? 0.1, p.sr1n2 ?? 1.7, p.sr1n3 ?? 1.7],
       r2: [p.sr2m ?? 7, p.sr2n1 ?? 0.3, p.sr2n2 ?? 0.5, p.sr2n3 ?? 0.5],
     };
-    buildTriangles(this.instS, this.tSerp, this.noise2D, this.posS!, this.colS!, cfg);
+    // Congelada + parámetros sin tocar → no reconstruimos (malla estática, sin gasto CPU).
+    const firma = `${t}|${N1},${N},${N2}|${cfg.R},${cfg.Z},${cfg.trn},${cfg.MV},${cfg.MXV}|${cfg.r1}|${cfg.r2}`;
+    if (firma === this.serpFirma && this.geoS) return;
+    this.serpFirma = firma;
+    buildTriangles(this.instS, t, this.noise2D, this.posS!, this.colS!, cfg);
     (this.geoS!.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     (this.geoS!.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
     this.geoS!.computeBoundingSphere();
@@ -756,7 +765,7 @@ const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,100); cam.pos
 const r=new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); r.setPixelRatio(Math.min(devicePixelRatio,2));
 document.body.appendChild(r.domElement);
 const ctl=new OrbitControls(cam,r.domElement); ctl.enableDamping=true;
-const reloj=new THREE.Clock(); let t=0;
+const reloj=new THREE.Clock(); let t=P.fase??0;
 r.setAnimationLoop(()=>{ const dt=reloj.getDelta(); t+=dt*(P.velocidad??0.3); build(t);
   geo.getAttribute('position').needsUpdate=true; geo.getAttribute('color').needsUpdate=true; geo.computeBoundingSphere();
   grupo.rotation.y += (P.giro??0)*dt; ctl.update(); r.render(escena,cam); });
