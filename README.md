@@ -19,6 +19,8 @@ El taller tiene cuatro espacios:
 
 La decisión de arquitectura que lo hace posible: **los salones solo entienden de parámetros numéricos y no saben de dónde vienen** — un slider, una ficha, un preset, un LFO o, mañana, una guitarra. Todas esas fuentes escriben en un mismo bus de parámetros (`ParamBus`); el salón solo lee.
 
+Una ramificación conceptual posible, desarrollada en el plan, es MIA como **luthería digital**: no solo generar visuales para música, sino construir instrumentos visuales de autor. En esa lectura, las fichas visuales, las escenas y los mapeos de sinestesia pueden convertirse en materiales tocables, grabables y exportables. La recomendación técnica para esa rama es una cadena Web Audio/Web MIDI → Meyda → Essentia.js → gestos propios de MIA → Mesa de Sinestesia → `ParamBus`.
+
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  SHELL     selector de salones · cajonera · panel de errores│
@@ -122,7 +124,7 @@ Añadir un salón nuevo es crear su clase (implementando el contrato `Salon`) y 
 
 ## Estado
 
-El ciclo del taller (modelar → coleccionar → componer → animar → imprimir) está funcionando. En curso: guardar los LFOs dentro de las fichas y modular los transforms de los actores. Después: los salones de compute shaders (partículas masivas) y, como Acto II, el instrumento musical escribiendo en el mismo bus. Detalle completo en **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)**.
+El ciclo del taller (modelar → coleccionar → componer → animar → imprimir) está funcionando. En curso: guardar los LFOs dentro de las fichas y modular los transforms de los actores. Después: los salones de compute shaders (partículas masivas) y, como Acto II, el instrumento musical escribiendo en el mismo bus. Una posible deriva de largo plazo es la luthería digital: tocar formas, guardar mapeos de sinestesia y grabar performances. Detalle completo en **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)**.
 
 ---
 

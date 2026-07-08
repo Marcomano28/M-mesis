@@ -9,6 +9,8 @@ import { ParamBus } from './core/ParamBus';
 import { Galeria } from './shell/Galeria';
 import { MotorLFO } from './core/Moduladores';
 import { PanelModuladores } from './shell/PanelModuladores';
+import { MotorSinestesia } from './core/Sinestesia';
+import { PanelSinestesia } from './shell/PanelSinestesia';
 import { SupershapesSalon } from './salones/supershapes/SupershapesSalon';
 import { CrossHatchSalon } from './salones/crosshatch/CrossHatchSalon';
 import { BajoRelieveSalon } from './salones/bajorelieve/BajoRelieveSalon';
@@ -38,8 +40,12 @@ const galeria = new Galeria(
 const motorLFO = new MotorLFO(bus);
 new PanelModuladores(motorLFO, () => galeria.destinosModulables());
 
+// Primera mesa de mapeo: fuentes vivas normalizadas → parámetros visuales
+const motorSinestesia = new MotorSinestesia(bus);
+new PanelSinestesia(motorSinestesia, () => galeria.destinosModulables());
+
 // Acceso de depuración desde la consola
-(window as unknown as Record<string, unknown>).MIA = { engine, bus, galeria, motorLFO };
+(window as unknown as Record<string, unknown>).MIA = { engine, bus, galeria, motorLFO, motorSinestesia };
 
 let errorLoop = false;
 engine.arrancar((dt, tiempo) => {
@@ -47,6 +53,7 @@ engine.arrancar((dt, tiempo) => {
   if (!salon) return;
   try {
     motorLFO.tick(tiempo); // los moduladores respiran antes de que el salón lea
+    motorSinestesia.tick(dt, tiempo); // la mesa de sinestesia escribe en el mismo plano
     salon.update(dt, tiempo, bus.deSalon(salon.id));
     errorLoop = false;
   } catch (err) {

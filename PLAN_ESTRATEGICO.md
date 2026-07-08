@@ -17,6 +17,19 @@ MIA nació como una **galería** de efectos con salones. Al construirla apareci�
 
 La decisión arquitectónica que hace todo esto posible sigue siendo la misma: **los salones solo entienden de parámetros numéricos y no saben de dónde vienen** (slider, ficha, preset, LFO o guitarra).
 
+### Ramificación conceptual: luthería digital
+
+Sin reemplazar la metáfora del taller, aparece una posible rama de largo plazo: MIA como **luthería digital**. No solo un sistema para hacer visuales reactivos, sino un lugar donde se construyen **instrumentos visuales de autor**.
+
+En esta lectura, el ciclo no termina en "generar una figura" ni en "hacer una escena", sino en **tocar formas**:
+
+- **Ficha visual**: una criatura, materia o estado paramétrico diseñado en un salón.
+- **Ficha de escena**: una composición de fichas visuales colocadas como actores.
+- **Ficha de sinestesia**: una forma de tocar esa escena; el mapeo entre gesto musical y comportamiento visual.
+- **Performance grabada**: la interpretación en el tiempo, no solo el preset.
+
+La música no decoraría una imagen: interpretaría una materia visual. Un ataque podría abrir una serpiente, un vibrato podría ondular un campo, un bend podría desplazar la topología de una figura, y el timbre podría navegar entre fichas creadas por el autor. El objetivo conceptual sería pasar de **modelar formas** a **construir instrumentos visuales**.
+
 ---
 
 ## 2. Estado actual — lo construido y verificado
@@ -123,6 +136,14 @@ La decisión arquitectónica que hace todo esto posible sigue siendo la misma: *
 - **Textura/frase** (1–10s): densidad de notas, tesitura, cromagrama → tensión armónica.
 - Analogía guía: fonemas (rasgos) → palabras (gestos) → frases (textura).
 
+*Recomendación técnica para extraer matices musicales.*
+- **Base nativa**: Web Audio API para entrada de micrófono/audio y Web MIDI API para controladores, pastillas MIDI, teclados y pedales.
+- **Baja latencia**: mover el análisis continuo a AudioWorklet cuando el prototipo salga del panel y entre en modo actuación.
+- **Primera librería**: Meyda para rasgos rápidos de timbre y energía: RMS, centroide espectral, rolloff, flatness, MFCC, loudness y flux.
+- **Segunda capa**: Essentia.js cuando hagan falta rasgos MIR más serios: pitch estable, onsets robustos, beat/tempo, chroma/HPCP, tonalidad, disonancia o clasificadores de timbre.
+- **Capa propia de MIA**: `MotorGestosMusicales`, construido encima de esas señales. Aquí viven vibrato, bend, staccato/legato, tensión, densidad, respiración y fraseo. Esta capa es autoral: las librerías extraen datos, pero MIA decide qué es un gesto visualmente significativo.
+- **Salida común**: todos los rasgos y gestos terminan como fuentes normalizadas en la Mesa de Sinestesia, que escribe modulaciones en el `ParamBus`.
+
 *Nivel 2 — Traducción: la MATRIZ DE MAPEO (la interfaz donde vive la estética).*
 - Mesa de ruteo modular: fuentes × destinos (direcciones del bus). Por celda: **curva** (log para pitch, compresión para dinámica), **rango**, y **suavizado asimétrico** (ataque rápido / caída lenta, como un compresor — ahí se decide si el visual es nervioso o elástico).
 - Mapeos 1:N (un ataque dispara pulso+color+escala) y N:1 (tensión visual = rugosidad+densidad+disonancia).
@@ -136,6 +157,8 @@ La decisión arquitectónica que hace todo esto posible sigue siendo la misma: *
 - ✅ **Embeddings de audio → navegación entre fichas**: el timbre proyectado a un espacio continuo, mapeado al espacio de parámetros de las fichas → la guitarra interpola entre figuras que el autor creó. La IA da mejores fuentes y mejores destinos; la composición sinestésica sigue siendo del autor.
 
 *Cierre de fase:* modo actuación (fullscreen sin UI, el Escenario como paisaje reactivo). Latencia esperada en navegador: 10–20ms para ataques/energía, 30–60ms para pitch (limitado por física de la onda, no por el navegador; percepción audiovisual integra como simultáneo hasta ~80–100ms). Si en directo molesta: Tauri, mismo código.
+
+*Deriva posible:* el instrumento puede convertirse en una rama propia de luthería digital: presets de instrumento por escena, fichas de sinestesia compartibles, grabación/reproducción de performances, y export de piezas interpretadas. Esta rama convive con el taller generativo; no lo sustituye.
 
 ---
 

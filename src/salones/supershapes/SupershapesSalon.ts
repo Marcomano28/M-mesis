@@ -1,9 +1,10 @@
-// Salón 1 — Formas Exóticas. Tres figuras (pestañas):
+// Salón 1 — Formas Exóticas. Cuatro familias (pestañas):
 //
 //   · Clásica   — supershape cerrada (esférica).
 //   · SuperFlor — superficie ABIERTA combinada (r1·r2) del proyecto supeFlower.
 //   · Serpiente — cuerpo orgánico animado (ruido simplex + envolvente de vida)
 //                 del mismo proyecto supeFlower. r1 en X, r2 en Y (separadas).
+//   · Caracol   — concha paramétrica con variantes de piel: peludo, picos y moro.
 //
 // Cada figura tiene TRES modos de exposición: puntos, alambre y caras,
 // más resolución variable y color — los atributos que heredan las fichas.
@@ -16,12 +17,13 @@
 import * as THREE from 'three/webgpu';
 import {
   Fn, uniform, float, vec3, vec4, uv, mix, abs, sin, cos, exp, max,
-  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute, mx_noise_float,
+  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute, mx_noise_float, fract,
 } from 'three/tsl';
 import type { Salon, Params, ParamDef, Pestana } from '../../core/Salon';
 
 const PI = Math.PI;
 const VISTA = { Puntos: 0, Alambre: 1, Caras: 2 };
+const CARACOL = { Peludo: 0, Picos: 1, Moro: 2 };
 
 export class SupershapesSalon implements Salon {
   id = 'supershapes';
@@ -112,6 +114,23 @@ export class SupershapesSalon implements Salon {
         { clave: 'sr2n3', etiqueta: 'r2 · n3', valor: 0.5, min: 0.01, max: 5 },
       ],
     },
+    {
+      titulo: 'Caracol',
+      params: [
+        { clave: 'cVariante', etiqueta: 'variante', valor: 0, min: 0, max: 2, opciones: CARACOL },
+        { clave: 'cFase',     etiqueta: 'fase',     valor: 0,    min: 0,    max: 20 },
+        { clave: 'cVel',      etiqueta: 'velocidad', valor: 0.2, min: 0,    max: 2 },
+        { clave: 'cRadio',    etiqueta: 'radio',    valor: 14,   min: 4,    max: 40 },
+        { clave: 'cVueltas',  etiqueta: 'vueltas',  valor: 2,    min: 0.5,  max: 5 },
+        { clave: 'cZ',        etiqueta: 'curva Z',  valor: 1.4,  min: 0.5,  max: 2.5 },
+        { clave: 'cPiel',     etiqueta: 'piel',     valor: 1,    min: 0,    max: 1, opciones: { No: 0, 'Sí': 1 } },
+        { clave: 'cGotas',    etiqueta: 'gotas',    valor: 1,    min: 0,    max: 1, opciones: { No: 0, 'Sí': 1 } },
+        { clave: 'cIntensidad', etiqueta: 'intensidad', valor: 1, min: -2,   max: 2 },
+        { clave: 'cRuido',    etiqueta: 'ruido',    valor: 0.6,  min: 0,    max: 2 },
+        { clave: 'cDensidad', etiqueta: 'densidad piel', valor: 0.7, min: 0.1, max: 1 },
+        { clave: 'cGrosor',   etiqueta: 'grosor',   valor: 0.025, min: 0.002, max: 0.12 },
+      ],
+    },
   ];
 
   // — Uniforms: el único canal CPU→GPU tras la carga inicial —
@@ -142,14 +161,29 @@ export class SupershapesSalon implements Salon {
   // 3 representaciones por figura, compartiendo retícula y grafo de posición
   private objC: { puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh } | null = null;
   private objF: { puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh } | null = null;
+  private objCar: {
+    puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh;
+    pelo: THREE.Mesh; gotas: THREE.Mesh; moro: THREE.Mesh;
+  } | null = null;
   private geoC: THREE.BufferGeometry | null = null;
   private geoF: THREE.BufferGeometry | null = null;
+  private geoCar: THREE.BufferGeometry | null = null;
+  private geoCarPelo: THREE.BufferGeometry | null = null;
+  private geoCarGotas: THREE.BufferGeometry | null = null;
+  private geoCarMoro: THREE.BufferGeometry | null = null;
   private resActual = 0;
 
   // — Serpiente: geometría GPU. Solo el conteo derivado de resolución regenera atributos. —
   private objS: { puntos: THREE.Points; alambre: THREE.Mesh; caras: THREE.Mesh } | null = null;
   private geoS: THREE.BufferGeometry | null = null;
   private serpCounts = { N1: 0, N: 0, N2: 0 };
+  private uCar = {
+    variante: uniform(0), fase: uniform(0), R: uniform(14), vueltas: uniform(2), zExp: uniform(1.4),
+    piel: uniform(1), gotas: uniform(1), intensidad: uniform(1), ruido: uniform(0.6), densidad: uniform(0.7), grosor: uniform(0.025),
+    nTh: uniform(56), nPh: uniform(26), kPelo: uniform(9),
+  };
+  private caracolCounts = { nTh: 0, nPh: 0 };
+  private caracolFase = 0;
 
   init(escena: THREE.Scene): void {
     this.objC = this.crearRepresentaciones(this.nodoPosClasica(), this.nodoColorClasica());
@@ -161,14 +195,24 @@ export class SupershapesSalon implements Salon {
       o.frustumCulled = false; // las posiciones vienen del shader: la cota CPU no las conoce
     }
     this.regenerarSerpiente(...this.conteosSerpiente(256)); // hornea atributos iniciales (semillas aleatorias)
+    this.objCar = this.crearCaracol();
+    for (const o of [this.objCar.puntos, this.objCar.alambre, this.objCar.caras, this.objCar.pelo, this.objCar.gotas, this.objCar.moro]) {
+      o.rotation.set(-Math.PI * 0.56, 0, Math.PI * 0.95);
+      o.frustumCulled = false;
+    }
+    this.regenerarCaracol(...this.conteosCaracol(256));
     for (const o of [this.objC, this.objF, this.objS]) this.grupo.add(o.puntos, o.alambre, o.caras);
+    this.grupo.add(
+      this.objCar.puntos, this.objCar.alambre, this.objCar.caras,
+      this.objCar.pelo, this.objCar.gotas, this.objCar.moro,
+    );
     escena.add(this.grupo);
     this.resActual = 0; // fuerza regeneración de retícula en el primer update
   }
 
   update(dt: number, _t: number, p: Params): void {
     // — Visibilidad: figura activa (pestaña) × modo de exposición —
-    const modo = p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
+    const modo = p.modo === 3 ? 3 : p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
     const vista = p.vista === 1 ? 1 : p.vista === 2 ? 2 : 0;
 
     // — Retícula de Clásica/SuperFlor: solo se regenera si su resolución cambió.
@@ -188,9 +232,12 @@ export class SupershapesSalon implements Salon {
     aplicar(this.objC, modo === 0);
     aplicar(this.objF, modo === 1);
     aplicar(this.objS, modo === 2);
+    aplicar(this.objCar, modo === 3);
 
     // — Serpiente: solo actualiza uniforms y, si cambió la resolución, atributos estáticos —
     if (modo === 2) this.actualizarSerpiente(p, res);
+    if (modo === 3) this.actualizarCaracol(dt, p, res);
+    this.actualizarVisibilidadCaracol(modo, p);
 
     // — Uniforms —
     const c = this.uC;
@@ -221,14 +268,27 @@ export class SupershapesSalon implements Salon {
     this.geoC?.dispose();
     this.geoF?.dispose();
     this.geoS?.dispose();
+    this.geoCar?.dispose();
+    this.geoCarPelo?.dispose();
+    this.geoCarGotas?.dispose();
+    this.geoCarMoro?.dispose();
     for (const o of [this.objC, this.objF, this.objS]) {
       if (!o) continue;
       (o.puntos.material as THREE.Material).dispose();
       (o.alambre.material as THREE.Material).dispose();
       (o.caras.material as THREE.Material).dispose();
     }
-    this.objC = this.objF = this.objS = null;
-    this.geoS = null;
+    if (this.objCar) {
+      (this.objCar.puntos.material as THREE.Material).dispose();
+      (this.objCar.alambre.material as THREE.Material).dispose();
+      (this.objCar.caras.material as THREE.Material).dispose();
+      (this.objCar.pelo.material as THREE.Material).dispose();
+      (this.objCar.gotas.material as THREE.Material).dispose();
+      (this.objCar.moro.material as THREE.Material).dispose();
+    }
+    this.objC = this.objF = this.objS = this.objCar = null;
+    this.geoS = this.geoCar = this.geoCarPelo = this.geoCarGotas = this.geoCarMoro = null;
+    this.caracolCounts = { nTh: 0, nPh: 0 };
     this.grupo.clear();
   }
 
@@ -265,6 +325,421 @@ export class SupershapesSalon implements Salon {
     if (this.objF) this.objF.puntos.geometry = this.objF.alambre.geometry = this.objF.caras.geometry = this.geoF;
   }
 
+  // ————— Caracol (GPU: identidad horneada, posición/color en shader) —————
+
+  private crearCaracol() {
+    const geo = new THREE.BufferGeometry();
+    const pos = this.nodoPosCaracol();
+
+    const matPuntos = new THREE.PointsNodeMaterial();
+    matPuntos.positionNode = pos;
+    matPuntos.colorNode = this.nodoColorCaracol();
+
+    const matAlambre = new THREE.MeshBasicNodeMaterial({ wireframe: true, transparent: true, opacity: 0.5 });
+    matAlambre.positionNode = pos;
+    matAlambre.colorNode = this.uColor;
+
+    const matCaras = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+    matCaras.positionNode = pos;
+    matCaras.colorNode = this.nodoColorCaracol();
+
+    const matPelo = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.45, depthWrite: false });
+    matPelo.positionNode = this.nodoPosPeloCaracol();
+    matPelo.colorNode = vec3(0.92, 0.94, 0.86);
+
+    const matGotas = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
+    matGotas.positionNode = this.nodoPosGotaCaracol();
+    matGotas.colorNode = this.nodoColorGotaCaracol();
+
+    const matMoro = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false });
+    matMoro.positionNode = this.nodoPosMoroCaracol();
+    matMoro.colorNode = this.nodoColorMoroCaracol();
+
+    return {
+      puntos: new THREE.Points(geo, matPuntos),
+      alambre: new THREE.Mesh(geo, matAlambre),
+      caras: new THREE.Mesh(geo, matCaras),
+      pelo: new THREE.Mesh(new THREE.BufferGeometry(), matPelo),
+      gotas: new THREE.Mesh(new THREE.BufferGeometry(), matGotas),
+      moro: new THREE.Mesh(new THREE.BufferGeometry(), matMoro),
+    };
+  }
+
+  private actualizarCaracol(dt: number, p: Params, res: number): void {
+    const [nTh, nPh] = this.conteosCaracol(res);
+    if (nTh !== this.caracolCounts.nTh || nPh !== this.caracolCounts.nPh) {
+      this.regenerarCaracol(nTh, nPh);
+    }
+    this.caracolFase += dt * (p.cVel ?? 0.2);
+    const u = this.uCar;
+    u.variante.value = p.cVariante === 2 ? 2 : p.cVariante === 1 ? 1 : 0;
+    u.fase.value = (p.cFase ?? 0) + this.caracolFase;
+    u.R.value = p.cRadio ?? 14;
+    u.vueltas.value = p.cVueltas ?? 2;
+    u.zExp.value = p.cZ ?? 1.4;
+    u.piel.value = p.cPiel ?? 1;
+    u.gotas.value = p.cGotas ?? 1;
+    u.intensidad.value = p.cIntensidad ?? 1;
+    u.ruido.value = p.cRuido ?? 0.6;
+    u.densidad.value = p.cDensidad ?? 0.7;
+    u.grosor.value = p.cGrosor ?? 0.025;
+    u.nTh.value = nTh;
+    u.nPh.value = nPh;
+  }
+
+  private actualizarVisibilidadCaracol(modo: number, p: Params): void {
+    if (!this.objCar) return;
+    const variante = p.cVariante === 2 ? 2 : p.cVariante === 1 ? 1 : 0;
+    const piel = (p.cPiel ?? 1) > 0.001;
+    const gotas = (p.cGotas ?? 1) > 0.001;
+    this.objCar.pelo.visible = modo === 3 && variante === 0 && piel;
+    this.objCar.gotas.visible = modo === 3 && variante === 0 && piel && gotas;
+    this.objCar.moro.visible = modo === 3 && variante === 2 && piel;
+  }
+
+  private conteosCaracol(res: number): [number, number] {
+    return [
+      Math.max(24, Math.min(110, Math.round(res * 0.22))),
+      Math.max(12, Math.min(60, Math.round(res * 0.1))),
+    ];
+  }
+
+  private regenerarCaracol(nTh: number, nPh: number): void {
+    // Indexada: cada celda tiene 5 vértices únicos (v0..v4); los 4 triángulos los
+    // reusan vía índices. Antes se emitían 12 vértices/celda (2.4× más trabajo de shader).
+    const TRI = [0, 1, 2, 0, 3, 2, 0, 3, 4, 0, 1, 4]; // v0..v4 por triángulo (índices locales)
+    const celdas = nTh * nPh;
+    const verts = celdas * 5;
+    const position = new Float32Array(verts * 3);
+    const aCar = new Float32Array(verts * 4); // (i, j, esquina, seed)
+    const idx = new Uint32Array(celdas * TRI.length);
+    let vi = 0, ii = 0;
+    for (let i = 0; i < nTh; i++) {
+      for (let j = 0; j < nPh; j++) {
+        const seed = 10 + Math.random() * 990;
+        const base = vi; // primer vértice (v0) de esta celda
+        for (let esquina = 0; esquina < 5; esquina++) {
+          aCar[vi * 4] = i;
+          aCar[vi * 4 + 1] = j;
+          aCar[vi * 4 + 2] = esquina;
+          aCar[vi * 4 + 3] = seed;
+          vi++;
+        }
+        for (const local of TRI) idx[ii++] = base + local;
+      }
+    }
+    this.geoCar?.dispose();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+    geo.setAttribute('aCar', new THREE.BufferAttribute(aCar, 4));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20);
+    this.geoCar = geo;
+    if (this.objCar) this.objCar.puntos.geometry = this.objCar.alambre.geometry = this.objCar.caras.geometry = geo;
+    this.caracolCounts = { nTh, nPh };
+    this.regenerarPeloYGotasCaracol(Math.max(160, Math.min(1500, Math.round(nTh * nPh * 0.85))), 9);
+    this.regenerarMoroCaracol(nTh, nPh);
+  }
+
+  private regenerarPeloYGotasCaracol(nPelo: number, kPelo: number): void {
+    const hairIdxLocal = [0, 2, 1, 2, 3, 1];
+    const octa = [
+      [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+    ];
+    const octaIdxLocal = [
+      4, 0, 2, 4, 2, 1, 4, 1, 3, 4, 3, 0,
+      5, 2, 0, 5, 1, 2, 5, 3, 1, 5, 0, 3,
+    ];
+    const segmentos = nPelo * kPelo;
+    const hairVerts = segmentos * 4;
+    const dropVerts = segmentos * octa.length;
+    const hairPos = new Float32Array(hairVerts * 3);
+    const hair = new Float32Array(hairVerts * 4);     // (k, extremo 0/1, lado -1/1, semilla)
+    const hairData = new Float32Array(hairVerts * 4); // (offset, theta01, tamaño, profundidad)
+    const hairIdx = new Uint32Array(segmentos * hairIdxLocal.length);
+    const dropPos = new Float32Array(dropVerts * 3);
+    const drop = new Float32Array(dropVerts * 4);      // (k, 0, 0, semilla)
+    const dropData = new Float32Array(dropVerts * 4);  // (offset, theta01, tamaño, profundidad)
+    const dropLocal = new Float32Array(dropVerts * 3);
+    const dropIdx = new Uint32Array(segmentos * octaIdxLocal.length);
+    let hv = 0, hi = 0, dv = 0, di = 0;
+    for (let i = 0; i < nPelo; i++) {
+      const seed = 10 + Math.random() * 990;
+      const offset = Math.random();
+      const theta01 = Math.random();
+      const tam = 0.35 + 2.65 * Math.pow(Math.random(), 2.5);
+      const profundidad = 0.25 + 0.75 * Math.random();
+      for (let k = 0; k < kPelo; k++) {
+        const hBase = hv;
+        for (let v = 0; v < 4; v++) {
+          const extremo = v < 2 ? 0 : 1;
+          const lado = v === 0 || v === 2 ? 1 : -1;
+          hair[hv * 4] = k;
+          hair[hv * 4 + 1] = extremo;
+          hair[hv * 4 + 2] = lado;
+          hair[hv * 4 + 3] = seed;
+          hairData[hv * 4] = offset;
+          hairData[hv * 4 + 1] = theta01;
+          hairData[hv * 4 + 2] = tam;
+          hairData[hv * 4 + 3] = profundidad;
+          hv++;
+        }
+        for (const local of hairIdxLocal) hairIdx[hi++] = hBase + local;
+
+        const dBase = dv;
+        for (const local of octa) {
+          drop[dv * 4] = k;
+          drop[dv * 4 + 3] = seed;
+          dropData[dv * 4] = offset;
+          dropData[dv * 4 + 1] = theta01;
+          dropData[dv * 4 + 2] = tam;
+          dropData[dv * 4 + 3] = profundidad;
+          dropLocal[dv * 3] = local[0];
+          dropLocal[dv * 3 + 1] = local[1];
+          dropLocal[dv * 3 + 2] = local[2];
+          dv++;
+        }
+        for (const local of octaIdxLocal) dropIdx[di++] = dBase + local;
+      }
+    }
+
+    this.geoCarPelo?.dispose();
+    this.geoCarGotas?.dispose();
+    const geoPelo = new THREE.BufferGeometry();
+    geoPelo.setAttribute('position', new THREE.BufferAttribute(hairPos, 3));
+    geoPelo.setAttribute('aPelo', new THREE.BufferAttribute(hair, 4));
+    geoPelo.setAttribute('aPeloData', new THREE.BufferAttribute(hairData, 4));
+    geoPelo.setIndex(new THREE.BufferAttribute(hairIdx, 1));
+    geoPelo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20);
+    const geoGotas = new THREE.BufferGeometry();
+    geoGotas.setAttribute('position', new THREE.BufferAttribute(dropPos, 3));
+    geoGotas.setAttribute('aGota', new THREE.BufferAttribute(drop, 4));
+    geoGotas.setAttribute('aGotaData', new THREE.BufferAttribute(dropData, 4));
+    geoGotas.setAttribute('aGotaLocal', new THREE.BufferAttribute(dropLocal, 3));
+    geoGotas.setIndex(new THREE.BufferAttribute(dropIdx, 1));
+    geoGotas.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20);
+    this.geoCarPelo = geoPelo;
+    this.geoCarGotas = geoGotas;
+    if (this.objCar) {
+      this.objCar.pelo.geometry = geoPelo;
+      this.objCar.gotas.geometry = geoGotas;
+    }
+    this.uCar.kPelo.value = kPelo;
+  }
+
+  private regenerarMoroCaracol(nTh: number, nPh: number): void {
+    const segIdxLocal = [0, 2, 1, 2, 3, 1];
+    const segmentos = nTh * nPh * 4;
+    const verts = segmentos * 4;
+    const position = new Float32Array(verts * 3);
+    const aMoro = new Float32Array(verts * 4);  // (i, j, borde, extremo)
+    const aMoro2 = new Float32Array(verts * 4); // (lado, semilla, _, _)
+    const idx = new Uint32Array(segmentos * segIdxLocal.length);
+    let vi = 0, ii = 0;
+    for (let i = 0; i < nTh; i++) {
+      for (let j = 0; j < nPh; j++) {
+        const seed = 10 + Math.random() * 990;
+        for (let borde = 0; borde < 4; borde++) {
+          const base = vi;
+          for (let v = 0; v < 4; v++) {
+            aMoro[vi * 4] = i;
+            aMoro[vi * 4 + 1] = j;
+            aMoro[vi * 4 + 2] = borde;
+            aMoro[vi * 4 + 3] = v < 2 ? 0 : 1;
+            aMoro2[vi * 4] = v === 0 || v === 2 ? 1 : -1;
+            aMoro2[vi * 4 + 1] = seed;
+            vi++;
+          }
+          for (const local of segIdxLocal) idx[ii++] = base + local;
+        }
+      }
+    }
+    this.geoCarMoro?.dispose();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
+    geo.setAttribute('aMoro', new THREE.BufferAttribute(aMoro, 4));
+    geo.setAttribute('aMoro2', new THREE.BufferAttribute(aMoro2, 4));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20);
+    this.geoCarMoro = geo;
+    if (this.objCar) this.objCar.moro.geometry = geo;
+  }
+
+  private posCaracol(r: any, ph: any, th: any): any {
+    const u = this.uCar;
+    const shell = cos(ph).add(1);
+    const zSeed = max(th.add(0.375).mul(PI), 0.001);
+    return vec3(
+      r.mul(th).mul(cos(th)).mul(shell),
+      r.mul(th).mul(sin(th)).mul(shell),
+      r.mul(th).mul(sin(ph)).sub(zSeed.pow(u.zExp)),
+    ).mul(0.01);
+  }
+
+  private normalCaracol(r: any, ph: any, th: any): any {
+    const e = 0.004;
+    const a = this.posCaracol(r, ph, th);
+    const b = this.posCaracol(r, ph.add(e), th);
+    const c = this.posCaracol(r, ph, th.add(e));
+    return normalize(cross(b.sub(a), c.sub(a)));
+  }
+
+  private nodoPosCaracol(): any {
+    const u = this.uCar;
+    return Fn(() => {
+      const id = attribute('aCar', 'vec4');
+      const i = id.x, j = id.y, corner = id.z, seed = id.w;
+      const thMax = u.vueltas.mul(2 * PI);
+      const th0 = i.div(u.nTh).mul(thMax);
+      const th1 = i.add(1).div(u.nTh).mul(thMax);
+      const ph0 = j.div(u.nPh).mul(2 * PI).sub(PI);
+      const ph1 = j.add(1).div(u.nPh).mul(2 * PI).sub(PI);
+      const thC = th0.add(th1).mul(0.5);
+      const phC = ph0.add(ph1).mul(0.5);
+      const c1 = corner.lessThan(1.5);
+      const c2 = corner.lessThan(2.5);
+      const c3 = corner.lessThan(3.5);
+      const phV = select(corner.lessThan(0.5), phC, select(c1, ph0, select(c2, ph1, select(c3, ph1, ph0))));
+      const thV = select(corner.lessThan(0.5), thC, select(c1, th0, select(c2, th0, th1)));
+      const base = this.posCaracol(u.R, phV, thV);
+      const centro = this.posCaracol(u.R, phC, thC);
+      const ruido = this.snoise01(seed.add(thC.mul(u.ruido)).add(u.fase.mul(0.2)));
+      const env = sin(phC).mul(0.5).add(0.5);
+
+      const picoR = u.R.add(u.R.mul(0.85).mul(u.intensidad).mul(env).mul(ruido.pow(2.4)));
+      const picoCentro = this.posCaracol(picoR, phC, thC);
+      const pico = select(corner.lessThan(0.5), picoCentro, base);
+
+      const concha = mix(base, centro, select(corner.lessThan(0.5), 0.05, 0));
+      return select(u.variante.lessThan(1.5), select(u.variante.lessThan(0.5), concha, pico), concha);
+    })();
+  }
+
+  private nodoColorCaracol(): any {
+    const u = this.uCar;
+    return Fn(() => {
+      const id = attribute('aCar', 'vec4');
+      const i = id.x, j = id.y, seed = id.w;
+      const q = i.div(max(u.nTh.sub(1), 1));
+      const ruido = this.snoise01(seed.add(j.mul(0.31)).add(u.fase.mul(0.2)));
+      const peludo = vec3(0.85, 0.86, 0.78).mul(ruido.mul(0.35).add(0.65));
+      const picos = vec3(0.18, 0.16, 0.12).add(vec3(0.55, 0.48, 0.36).mul(ruido));
+      const moroA = vec3(0.36, 0.82, 1.0);
+      const moroB = vec3(0.72, 0.62, 1.0);
+      const moro = select(this.snoise01(i.mul(3.7).add(j.mul(9.1))).greaterThan(0.5), moroB, moroA);
+      const base = select(u.variante.lessThan(0.5), peludo, select(u.variante.lessThan(1.5), picos, moro));
+      return base.mul(q.mul(0.25).add(0.8)).mul(this.uColor);
+    })();
+  }
+
+  private marcoPeloCaracol(id: any, data: any): { superficie: any; gota: any; lado: any; ancho: any; tamGota: any; activo: any } {
+    const u = this.uCar;
+    const k = id.x, seed = id.w;
+    const offset = data.x, theta01 = data.y, tam = data.z, profundidad = data.w;
+    const p = fract(k.add(u.fase.mul(0.75)).add(offset).div(u.kPelo));
+    const ph = p.mul(2 * PI).sub(PI);
+    const th = theta01.mul(u.vueltas).mul(2 * PI);
+    const n = this.normalCaracol(u.R, ph, th);
+    const superficie = this.posCaracol(u.R, ph, th);
+    const lenRuido = this.snoise01(seed.add(p.mul(7))).mul(0.75).add(0.25).pow(4);
+    const largo = u.R.mul(0.01).mul(abs(u.intensidad).mul(2.25).add(0.35)).mul(lenRuido).mul(profundidad);
+    const gota = superficie.sub(n.mul(largo));
+    const lado = normalize(vec3(n.y, n.x.negate(), 0));
+    const activo = select(fract(seed.mul(0.017)).lessThan(u.densidad), u.piel, 0);
+    const szRuido = this.snoise01(seed.add(p.mul(17))).mul(0.9).add(0.5);
+    return {
+      superficie,
+      gota,
+      lado,
+      ancho: tam.mul(szRuido).mul(0.0026).mul(activo),
+      tamGota: tam.mul(szRuido).mul(0.0065).mul(activo).mul(u.gotas),
+      activo,
+    };
+  }
+
+  private nodoPosPeloCaracol(): any {
+    return Fn(() => {
+      const id = attribute('aPelo', 'vec4');
+      const data = attribute('aPeloData', 'vec4');
+      const marco = this.marcoPeloCaracol(id, data);
+      const centro = mix(marco.superficie, marco.gota, id.y);
+      return centro.add(marco.lado.mul(marco.ancho).mul(id.z));
+    })();
+  }
+
+  private nodoPosGotaCaracol(): any {
+    return Fn(() => {
+      const id = attribute('aGota', 'vec4');
+      const data = attribute('aGotaData', 'vec4');
+      const local = attribute('aGotaLocal', 'vec3');
+      const marco = this.marcoPeloCaracol(id, data);
+      return marco.gota.add(local.mul(marco.tamGota));
+    })();
+  }
+
+  private nodoColorGotaCaracol(): any {
+    return Fn(() => {
+      const id = attribute('aGota', 'vec4');
+      const brillo = this.snoise01(id.w.mul(0.71).add(this.uCar.fase.mul(0.35))).mul(0.25).add(0.75);
+      return vec3(0.9, 0.96, 1.0).mul(brillo);
+    })();
+  }
+
+  private esquinasMoro(i: any, j: any): { a: any; b: any; c: any; d: any; centro: any; n: any } {
+    const u = this.uCar;
+    const thMax = u.vueltas.mul(2 * PI);
+    const th0 = i.div(u.nTh).mul(thMax);
+    const th1 = i.add(1).div(u.nTh).mul(thMax);
+    const ph0 = j.div(u.nPh).mul(2 * PI).sub(PI);
+    const ph1 = j.add(1).div(u.nPh).mul(2 * PI).sub(PI);
+    const phC = ph0.add(ph1).mul(0.5);
+    const thC = th0.add(th1).mul(0.5);
+    const a = this.posCaracol(u.R.mul(1.006), ph0, th0);
+    const b = this.posCaracol(u.R.mul(1.006), ph1, th0);
+    const c = this.posCaracol(u.R.mul(1.006), ph1, th1);
+    const d = this.posCaracol(u.R.mul(1.006), ph0, th1);
+    return { a, b, c, d, centro: a.add(b).add(c).add(d).mul(0.25), n: this.normalCaracol(u.R, phC, thC) };
+  }
+
+  private puntoBordeMoro(edge: any, a: any, b: any, c: any, d: any): any {
+    return select(edge.lessThan(0.5), a,
+      select(edge.lessThan(1.5), b, select(edge.lessThan(2.5), c, d)));
+  }
+
+  private nodoPosMoroCaracol(): any {
+    const u = this.uCar;
+    return Fn(() => {
+      const id = attribute('aMoro', 'vec4');
+      const extra = attribute('aMoro2', 'vec4');
+      const edge = id.z;
+      const esq = this.esquinasMoro(id.x, id.y);
+      const a0 = this.puntoBordeMoro(edge, esq.a, esq.b, esq.c, esq.d);
+      const a1 = this.puntoBordeMoro(edge.add(1).sub(select(edge.greaterThan(2.5), 4, 0)), esq.a, esq.b, esq.c, esq.d);
+      const b0 = this.puntoBordeMoro(edge.add(1).sub(select(edge.greaterThan(2.5), 4, 0)), esq.a, esq.b, esq.c, esq.d);
+      const b1 = this.puntoBordeMoro(edge.add(2).sub(select(edge.greaterThan(1.5), 4, 0)), esq.a, esq.b, esq.c, esq.d);
+      const inicio = a0.add(a1).mul(0.5);
+      const siguiente = b0.add(b1).mul(0.5);
+      const interior = mix(esq.centro, siguiente, 0.72);
+      const centro = mix(inicio, interior, id.w);
+      const dir = normalize(interior.sub(inicio));
+      const lado = normalize(cross(esq.n, dir));
+      const ancho = u.R.mul(u.grosor).mul(0.0028).mul(u.piel);
+      return centro.add(esq.n.mul(0.006)).add(lado.mul(ancho).mul(extra.x));
+    })();
+  }
+
+  private nodoColorMoroCaracol(): any {
+    return Fn(() => {
+      const id = attribute('aMoro', 'vec4');
+      const extra = attribute('aMoro2', 'vec4');
+      const ruido = this.snoise01(extra.y.add(id.x.mul(2.3)).add(id.y.mul(5.1)));
+      const violeta = vec3(0.4, 0.32, 1.0);
+      const cyan = vec3(0.18, 0.82, 1.0);
+      const blanco = vec3(0.92, 0.95, 1.0);
+      return select(ruido.greaterThan(0.72), blanco, select(ruido.greaterThan(0.38), cyan, violeta));
+    })();
+  }
+
   // ————— Serpiente (GPU animada) —————
 
   private crearSerpiente() {
@@ -297,27 +772,31 @@ export class SupershapesSalon implements Salon {
    * Semillas aleatorias por instancia → variación orgánica nueva en cada regeneración/montaje.
    */
   private regenerarSerpiente(N1: number, N: number, N2: number): void {
+    // Indexada, igual que el caracol: 5 vértices únicos (v0..v4) por celda (instancia × k),
+    // reusados por los 4 triángulos. Antes eran 12 vértices/celda (2.4× más trabajo de shader).
     const K = Math.ceil(N2 / N);
-    const verts = N1 * N * K * 4 * 3; // instancias × K × 4 triángulos × 3 vértices
+    const TRI = [0, 1, 2, 0, 3, 2, 0, 3, 4, 0, 1, 4]; // v0..v4 por triángulo (índices locales)
+    const celdas = N1 * N * K;
+    const verts = celdas * 5;
     this.geoS?.dispose();
     const position = new Float32Array(verts * 3); // dummy: positionNode lo sobreescribe
     const aIJK = new Float32Array(verts * 3);     // (i, j, k)
     const aInst = new Float32Array(verts * 4);    // (esquina 0..4, seed, off, di)
-    const TRI = [[0, 1, 2], [0, 3, 2], [0, 3, 4], [0, 1, 4]]; // índices de v0..v4 por triángulo
-    let vi = 0;
+    const idx = new Uint32Array(celdas * TRI.length);
+    let vi = 0, ii = 0;
     for (let i = 0; i < N1; i++) {
       for (let j = 0; j < N; j++) {
         const seed = 10 + Math.random() * 990;
         const off = 0.4 + 0.8 * (Math.random() * 2 - 1);
         const di = 120 + Math.random() * 680;
         for (let k = 0; k < K; k++) {
-          for (const tri of TRI) {
-            for (const esquina of tri) {
-              aIJK[vi * 3] = i; aIJK[vi * 3 + 1] = j; aIJK[vi * 3 + 2] = k;
-              aInst[vi * 4] = esquina; aInst[vi * 4 + 1] = seed; aInst[vi * 4 + 2] = off; aInst[vi * 4 + 3] = di;
-              vi++;
-            }
+          const base = vi; // primer vértice (v0) de esta celda
+          for (let esquina = 0; esquina < 5; esquina++) {
+            aIJK[vi * 3] = i; aIJK[vi * 3 + 1] = j; aIJK[vi * 3 + 2] = k;
+            aInst[vi * 4] = esquina; aInst[vi * 4 + 1] = seed; aInst[vi * 4 + 2] = off; aInst[vi * 4 + 3] = di;
+            vi++;
           }
+          for (const local of TRI) idx[ii++] = base + local;
         }
       }
     }
@@ -325,6 +804,7 @@ export class SupershapesSalon implements Salon {
     geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
     geo.setAttribute('aIJK', new THREE.BufferAttribute(aIJK, 3));
     geo.setAttribute('aInst', new THREE.BufferAttribute(aInst, 4));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20); // el shader mueve todo: cota amplia
     this.geoS = geo;
     if (this.objS) this.objS.puntos.geometry = this.objS.alambre.geometry = this.objS.caras.geometry = geo;
@@ -560,7 +1040,7 @@ export class SupershapesSalon implements Salon {
 
   exportar(p: Params): string {
     const modo = p.modo ?? 0;
-    const plantilla = modo === 2 ? PLANTILLA_SERPIENTE : modo === 1 ? PLANTILLA_FLOR : PLANTILLA_CLASICA;
+    const plantilla = modo === 3 ? PLANTILLA_CARACOL : modo === 2 ? PLANTILLA_SERPIENTE : modo === 1 ? PLANTILLA_FLOR : PLANTILLA_CLASICA;
     return plantilla
       .replaceAll('__PARAMS__', JSON.stringify(p))
       .replaceAll('__RES__', '128')
@@ -598,6 +1078,35 @@ const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true;
 const reloj = new THREE.Clock();
 r.setAnimationLoop(()=>{ puntos.rotation.y += P.giro*reloj.getDelta(); ctl.update(); r.render(escena,cam); });
 addEventListener('resize',()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); r.setSize(innerWidth,innerHeight); });
+</script></body></html>`;
+
+const PLANTILLA_CARACOL = `<!doctype html>
+<html><head><meta charset="utf-8"><title>MIA — caracol</title>
+<style>html,body{margin:0;height:100%;background:#050507;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"}}</script>
+</head><body><script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const P=__PARAMS__, PI=Math.PI, RES=Math.max(8,Math.round(P.resolucion??128));
+const cfg={r:P.cRadio??14,vueltas:P.cVueltas??2,zExp:P.cZ??1.4,piel:(P.cPiel??1)>0.5,intensidad:P.cIntensidad??1,ruido:P.cRuido??0.6,densidad:P.cDensidad??0.7,grosor:P.cGrosor??0.025,nTh:Math.max(24,Math.min(110,Math.round(RES*.22))),nPh:Math.max(12,Math.min(60,Math.round(RES*.1)))};
+const rnd=(a,b)=>{const s=Math.sin(a*127.1+b*311.7)*43758.5453123;return s-Math.floor(s);};
+const pos=(r,ph,th)=>{const sh=Math.cos(ph)+1,zs=Math.max(.001,(th+.375)*PI);return new THREE.Vector3(r*th*Math.cos(th)*sh,r*th*Math.sin(th)*sh,r*th*Math.sin(ph)-Math.pow(zs,cfg.zExp)).multiplyScalar(.01);};
+const nrm=(r,ph,th)=>{const e=.004,a=pos(r,ph,th),b=pos(r,ph+e,th),c=pos(r,ph,th+e);return b.sub(a).cross(c.sub(a)).normalize();};
+const ps=[],cs=[]; function tri(a,b,c,col){for(const v of [a,b,c])ps.push(v.x,v.y,v.z);for(let i=0;i<3;i++)cs.push(col[0],col[1],col[2]);}
+function strip(a,b,w,col){const d=b.clone().sub(a),s=new THREE.Vector3(-d.y,d.x,0);if(s.lengthSq()<1e-5)s.set(1,0,0);s.normalize().multiplyScalar(w*.01);tri(a.clone().add(s),b.clone().add(s),b.clone().sub(s),col);tri(a.clone().add(s),b.clone().sub(s),a.clone().sub(s),col);}
+function needle(base,n,len,w,col){const tip=base.clone().add(n.clone().multiplyScalar(len*.01)),s=new THREE.Vector3(n.y,-n.x,0);if(s.lengthSq()<1e-5)s.set(1,0,0);s.normalize().multiplyScalar(w*.01);tri(base.clone().add(s),tip,base.clone().sub(s),col);}
+function base(variante){const tm=cfg.vueltas*2*PI;for(let i=0;i<cfg.nTh;i++){const t0=tm*i/cfg.nTh,t1=tm*(i+1)/cfg.nTh;for(let j=0;j<cfg.nPh;j++){const p0=-PI+2*PI*j/cfg.nPh,p1=-PI+2*PI*(j+1)/cfg.nPh,a=pos(cfg.r,p0,t0),b=pos(cfg.r,p1,t0),c=pos(cfg.r,p1,t1),d=pos(cfg.r,p0,t1),q=i/Math.max(1,cfg.nTh-1),co=variante===2?[.08+q*.14,.1+q*.08,.24+q*.28]:[.04+q*.08,.04+q*.07,.055+q*.09];tri(a,b,c,co);tri(a,c,d,co);}}}
+function picos(t){const tm=cfg.vueltas*2*PI;for(let i=0;i<cfg.nTh;i++){const t0=tm*i/cfg.nTh,t1=tm*(i+1)/cfg.nTh,th=(t0+t1)*.5;for(let j=0;j<cfg.nPh;j++){const p0=-PI+2*PI*j/cfg.nPh,p1=-PI+2*PI*(j+1)/cfg.nPh,ph=(p0+p1)*.5,s=rnd(i*1.9+t*.7,j*2.7+cfg.ruido*11),env=.35+.65*Math.max(0,Math.sin(ph)),dr=cfg.r*.8*cfg.intensidad*env*Math.pow(s,2.4),v0=pos(cfg.r+dr,ph,th),v1=pos(cfg.r,p0,t0),v2=pos(cfg.r,p1,t0),v3=pos(cfg.r,p1,t1),v4=pos(cfg.r,p0,t1),br=.18+.55*s,co=[br,br*.92,br*.78];tri(v0,v1,v2,co);tri(v0,v2,v3,co);tri(v0,v3,v4,co);tri(v0,v4,v1,co);}}}
+function peludo(t){if(!cfg.piel)return;const tm=cfg.vueltas*2*PI,st=Math.max(1,Math.round(3-cfg.densidad*2)),sp=Math.max(1,Math.round(4-cfg.densidad*3));for(let i=0;i<=cfg.nTh;i+=st){const th=tm*i/cfg.nTh;for(let j=0;j<=cfg.nPh;j+=sp){const pk=rnd(i*12.17,j*5.31);if(pk>cfg.densidad)continue;const ph=-PI+2*PI*((j+t*.7+pk)%cfg.nPh)/cfg.nPh,b=pos(cfg.r,ph,th),n=nrm(cfg.r,ph,th),len=cfg.r*(.35+2.4*cfg.intensidad)*Math.pow(rnd(i+t,j+cfg.ruido*19),3),w=cfg.r*cfg.grosor*(.5+pk);needle(b,n,len,w,[.85,.86,.78]);}}}
+function moro(){if(!cfg.piel)return;const tm=cfg.vueltas*2*PI,w=cfg.r*cfg.grosor*.55,mid=(a,b)=>a.clone().add(b).multiplyScalar(.5);for(let i=0;i<cfg.nTh;i++){const t0=tm*i/cfg.nTh,t1=tm*(i+1)/cfg.nTh;for(let j=0;j<cfg.nPh;j++){const p0=-PI+2*PI*j/cfg.nPh,p1=-PI+2*PI*(j+1)/cfg.nPh,a=pos(cfg.r*1.006,p0,t0),b=pos(cfg.r*1.006,p1,t0),c=pos(cfg.r*1.006,p1,t1),d=pos(cfg.r*1.006,p0,t1),co=(i+j)%2?[.36,.82,1]:[.72,.62,1];strip(mid(a,b),mid(c,d),w,co);if((i+j)%3===0)strip(mid(d,a),mid(b,c),w*.8,[.95,.95,1]);}}}
+function build(t){ps.length=0;cs.length=0;const v=P.cVariante===2?2:P.cVariante===1?1:0;if(v===1)picos(t);else{base(v);if(v===0)peludo(t);else moro();}geo.setAttribute('position',new THREE.Float32BufferAttribute(ps,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(cs,3));geo.computeBoundingSphere();}
+const geo=new THREE.BufferGeometry(); const mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
+mesh.rotation.set(-Math.PI*.56,0,Math.PI*.95); const grupo=new THREE.Group(); grupo.add(mesh); grupo.scale.setScalar(P.escala??2);
+const escena=new THREE.Scene(); escena.add(grupo); const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,100); cam.position.z=6;
+const r=new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); r.setPixelRatio(Math.min(devicePixelRatio,2)); document.body.appendChild(r.domElement);
+const ctl=new OrbitControls(cam,r.domElement); ctl.enableDamping=true; const reloj=new THREE.Clock(); let t=P.cFase??0;
+r.setAnimationLoop(()=>{const dt=reloj.getDelta();t+=dt*(P.cVel??.2);build(t);grupo.rotation.y+=(P.giro??0)*dt;ctl.update();r.render(escena,cam);});
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);});
 </script></body></html>`;
 
 const PLANTILLA_FLOR = `<!doctype html>
