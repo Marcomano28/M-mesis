@@ -8,6 +8,7 @@ instalarPanelErrores();
 import { ParamBus } from './core/ParamBus';
 import { Galeria } from './shell/Galeria';
 import { MotorLFO } from './core/Moduladores';
+import { MotorAcumuladores } from './core/Acumuladores';
 import { PanelModuladores } from './shell/PanelModuladores';
 import { MotorSinestesia } from './core/Sinestesia';
 import { PanelSinestesia } from './shell/PanelSinestesia';
@@ -36,16 +37,24 @@ const galeria = new Galeria(
   bus,
 );
 
-// Capa de animación: LFOs escribiendo en el plano de modulación del bus
+// Fuentes vivas: LFOs (oscilan) y Acumuladores (recuerdan — Etapa 1 del templo)
 const motorLFO = new MotorLFO(bus);
-new PanelModuladores(motorLFO, () => galeria.destinosModulables());
+const motorAcum = new MotorAcumuladores(bus);
+new PanelModuladores(motorLFO, motorAcum, () => galeria.destinosModulables());
+
+// La actividad del usuario alimenta a los acumuladores:
+bus.onEscritura(() => motorAcum.registrarActividad(1)); // mover cualquier slider
+addEventListener('pointermove', (e) => {
+  const v = (Math.abs(e.movementX) + Math.abs(e.movementY)) / 60; // velocidad del ratón
+  if (v > 0.05) motorAcum.registrarActividad(Math.min(1, v));
+});
 
 // Primera mesa de mapeo: fuentes vivas normalizadas → parámetros visuales
 const motorSinestesia = new MotorSinestesia(bus);
 new PanelSinestesia(motorSinestesia, () => galeria.destinosModulables());
 
 // Acceso de depuración desde la consola
-(window as unknown as Record<string, unknown>).MIA = { engine, bus, galeria, motorLFO, motorSinestesia };
+(window as unknown as Record<string, unknown>).MIA = { engine, bus, galeria, motorLFO, motorAcum, motorSinestesia };
 
 let errorLoop = false;
 engine.arrancar((dt, tiempo) => {
@@ -53,6 +62,7 @@ engine.arrancar((dt, tiempo) => {
   if (!salon) return;
   try {
     motorLFO.tick(tiempo); // los moduladores respiran antes de que el salón lea
+    motorAcum.tick(dt, tiempo); // la memoria digiere la actividad (Etapa 1)
     motorSinestesia.tick(dt, tiempo); // la mesa de sinestesia escribe en el mismo plano
     salon.update(dt, tiempo, bus.deSalon(salon.id));
     errorLoop = false;

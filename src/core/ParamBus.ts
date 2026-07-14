@@ -17,9 +17,18 @@ export class ParamBus {
   /** Rangos conocidos (de los ParamDef) para clamp del valor compuesto. */
   private rangos = new Map<string, { min: number; max: number }>();
 
+  private escuchasGlobales = new Set<(direccion: string, valor: number) => void>();
+
   set(direccion: string, valor: number): void {
     this.valores.set(direccion, valor);
     this.escuchas.get(direccion)?.forEach((fn) => fn(valor));
+    this.escuchasGlobales.forEach((fn) => fn(direccion, valor));
+  }
+
+  /** Escucha TODA escritura de base (los acumuladores miden actividad así). */
+  onEscritura(fn: (direccion: string, valor: number) => void): () => void {
+    this.escuchasGlobales.add(fn);
+    return () => this.escuchasGlobales.delete(fn);
   }
 
   /** Valor BASE (sin modulación) — lo que ven los sliders y las fichas. */

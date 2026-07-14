@@ -14,6 +14,9 @@ export interface LFO {
   frecuencia: number;   // Hz
   amplitud: number;     // en unidades del parámetro (±)
   fase: number;         // 0..1
+  /** Solo para forma 'ruido': exponente de Hurst H (IQ, fBM).
+   *  1 = suave con memoria (montaña, "yellow noise") · 0 = nervioso (lluvia, pink). */
+  rugosidad: number;
   activo: boolean;
 }
 
@@ -32,6 +35,7 @@ export class MotorLFO {
       frecuencia: 0.5,
       amplitud,
       fase: 0,
+      rugosidad: 1,
       activo: true,
     };
     this.lfos.push(lfo);
@@ -52,28 +56,47 @@ export class MotorLFO {
       if (previo && previo !== l.destino) this.bus.quitarModulacion(previo, l.id);
       this.destinoPrevio.set(l.id, l.destino);
 
-      const v = l.activo ? onda(l.forma, tiempo * l.frecuencia + l.fase) * l.amplitud : 0;
+      const v = l.activo ? onda(l.forma, tiempo * l.frecuencia + l.fase, l.rugosidad) * l.amplitud : 0;
       this.bus.modular(l.destino, l.id, v);
     }
   }
 }
 
-/** Formas de onda normalizadas a [-1, 1]. `x` en ciclos (1.0 = un periodo). */
-export function onda(forma: FormaLFO, x: number): number {
+/** Formas de onda normalizadas a [-1, 1]. `x` en ciclos (1.0 = un periodo).
+ *  `H` (solo 'ruido'): exponente de Hurst del fBM — 1 suave, 0 nervioso. */
+export function onda(forma: FormaLFO, x: number, H = 1): number {
   const p = x - Math.floor(x);
   switch (forma) {
     case 'seno':      return Math.sin(2 * Math.PI * x);
     case 'triangulo': return 1 - 4 * Math.abs(p - 0.5);
     case 'sierra':    return 2 * p - 1;
     case 'cuadrada':  return p < 0.5 ? 1 : -1;
-    case 'ruido': {
-      // Value noise suave: valores pseudoaleatorios por ciclo, interpolados
-      const i = Math.floor(x);
-      const a = azar(i), b = azar(i + 1);
-      const t = p * p * (3 - 2 * p); // smoothstep
-      return a + (b - a) * t;
-    }
+    case 'ruido':     return fbm(x, Math.max(0, Math.min(1, H)));
   }
+}
+
+/**
+ * fBM 1D (Íñigo Quílez, "fbm"): octavas de value noise con ganancia G = 2^-H.
+ * H=1 → "yellow noise", deriva con memoria (montañas). H=0 → pink, nervio puro.
+ * Frecuencias ligeramente destempladas (2.01) para que picos y ceros no coincidan.
+ */
+export function fbm(x: number, H: number, octavas = 4): number {
+  const G = 2 ** -H;
+  let f = 1, a = 1, suma = 0, norma = 0;
+  for (let i = 0; i < octavas; i++) {
+    suma += a * valueNoise(x * f + i * 13.7); // offset por octava: decorrelación
+    norma += a;
+    f *= 2.01;
+    a *= G;
+  }
+  return suma / norma; // normalizado a [-1, 1]
+}
+
+function valueNoise(x: number): number {
+  const i = Math.floor(x), p = x - i;
+  const t = p * p * (3 - 2 * p); // smoothstep
+  const a = azar(i), b = azar(i + 1);
+  return a + (b - a) * t;
 }
 
 function azar(i: number): number {
