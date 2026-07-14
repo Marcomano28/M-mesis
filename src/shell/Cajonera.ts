@@ -2,6 +2,7 @@
 // Clic en una card = recargar esa figura con sus parámetros exactos.
 
 import type { Ficha } from '../core/Fichas';
+import { confirmar } from './DialogoTexto';
 
 export interface CajoneraOpciones {
   alCargar: (ficha: Ficha) => void;
@@ -75,9 +76,11 @@ export class Cajonera {
       borrar.style.cssText =
         'position:absolute;top:4px;right:4px;width:20px;height:20px;border:none;border-radius:5px;' +
         'background:rgba(0,0,0,0.55);color:#ff9a9a;font:11px system-ui;cursor:pointer';
-      borrar.onclick = (e) => {
+      borrar.onclick = async (e) => {
         e.stopPropagation();
-        if (confirm(`¿Borrar la ficha «${f.nombre}»?`)) this.opciones.alBorrar(f.id);
+        if (await confirmar('Borrar ficha', `¿Quieres borrar «${f.nombre}»? Esta acción no se puede deshacer.`)) {
+          this.opciones.alBorrar(f.id);
+        }
       };
 
       card.onclick = () => this.opciones.alCargar(f);

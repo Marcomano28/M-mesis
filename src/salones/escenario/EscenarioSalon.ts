@@ -10,19 +10,17 @@
 import { Pane } from 'tweakpane';
 import * as THREE from 'three/webgpu';
 import type { Salon, Params, ParamDef, FichaParaSalon } from '../../core/Salon';
-
-interface Transform { x: number; y: number; z: number; rotY: number; escala: number }
-
-interface ActorDef {
-  ficha: FichaParaSalon;
-  transform: Transform;
-}
+import {
+  crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
+  type ActorEscena, type DocumentoEscena,
+} from '../../core/DocumentoEscena';
 
 interface ActorVivo {
-  def: ActorDef;
+  def: ActorEscena;
   salon: Salon;
   envoltura: THREE.Group;
   folder: { dispose(): void };
+  transformSucio: boolean;
 }
 
 export class EscenarioSalon implements Salon {
@@ -34,15 +32,17 @@ export class EscenarioSalon implements Salon {
   ];
 
   private raiz = new THREE.Group();
-  private defs: ActorDef[] = [];      // persiste aunque salgas del escenario
+  private documento: DocumentoEscena = crearDocumentoEscena();
   private vivos: ActorVivo[] = [];    // actores montados (solo mientras está activo
   private escena: THREE.Scene | null = null;
   private camara!: THREE.PerspectiveCamera;
   private pane: Pane | null = null;
   private contenedor: HTMLDivElement | null = null;
+  /** Invalida colas de montaje pendientes al cambiar o abandonar la escena. */
+  private generacionMontaje = 0;
 
-  /** fábricas: salonId → cómo crear una instancia nueva de ese salón. */
-  constructor(private fabricas: Record<string, () => Salon>) {}
+  /** fábricas: salonId → instancia ligera preparada para la receta del actor. */
+  constructor(private fabricas: Record<string, (params?: Params) => Salon>) {}
 
   init(escena: THREE.Scene, camara: THREE.PerspectiveCamera): void {
     this.escena = escena;
@@ -56,51 +56,90 @@ export class EscenarioSalon implements Salon {
     document.body.appendChild(this.contenedor);
     this.pane = new Pane({ container: this.contenedor, title: '🎭 Actores' });
 
-    // Re-montar lo que ya estaba compuesto
-    for (const def of this.defs) this.montar(def);
+    // Re-montar progresivamente: primero aparece el escenario y después entra
+    // un actor por frame, evitando bloquear un frame largo al cargar una obra.
+    this.montarProgresivo(this.documento.actores);
   }
 
   recibirFicha(ficha: FichaParaSalon): void {
-    const def: ActorDef = {
-      ficha: { salonId: ficha.salonId, nombre: ficha.nombre, params: { ...ficha.params } },
-      transform: { x: 0, y: 0, z: 0, rotY: 0, escala: 1 },
-    };
-    this.defs.push(def);
+    const def = crearActorEscena(ficha);
+    this.documento.actores.push(def);
     if (this.escena) this.montar(def);
   }
 
-  private montar(def: ActorDef): void {
+  private montarProgresivo(defs: ActorEscena[]): void {
+    const generacion = ++this.generacionMontaje;
+    const cola = [...defs];
+    const siguiente = () => {
+      if (generacion !== this.generacionMontaje || !this.escena) return;
+      const def = cola.shift();
+      if (!def) return;
+      this.montar(def);
+      if (cola.length) requestAnimationFrame(siguiente);
+    };
+    if (cola.length) requestAnimationFrame(siguiente);
+  }
+
+  private montar(def: ActorEscena): void {
     const fabrica = this.fabricas[def.ficha.salonId];
     if (!fabrica || !this.pane) {
       console.error(`El Escenario no tiene fábrica para el salón «${def.ficha.salonId}».`);
       return;
     }
     try {
-      const salon = fabrica();
+      const salon = fabrica(def.ficha.params);
       const envoltura = new THREE.Group();
       salon.init(envoltura as unknown as THREE.Scene, this.camara);
       this.raiz.add(envoltura);
 
       const folder = (this.pane as Pane).addFolder({ title: def.ficha.nombre, expanded: false });
       const t = def.transform;
-      folder.addBinding(t, 'x', { min: -8, max: 8, step: 0.01 });
-      folder.addBinding(t, 'y', { min: -8, max: 8, step: 0.01 });
-      folder.addBinding(t, 'z', { min: -8, max: 8, step: 0.01 });
-      folder.addBinding(t, 'rotY', { label: 'rotación', min: -Math.PI, max: Math.PI, step: 0.01 });
-      folder.addBinding(t, 'escala', { min: 0.05, max: 4, step: 0.01 });
+      const vivo: ActorVivo = { def, salon, envoltura, folder, transformSucio: true };
+      const sucio = () => { vivo.transformSucio = true; };
+      folder.addBinding(def.ficha, 'nombre', { label: 'nombre' });
+      folder.addBinding(def, 'visible', { label: 'en escena' }).on('change', sucio);
+      folder.addBinding(def, 'actividad', {
+        label: 'actuación',
+        options: { 'estático (ahorra)': 'estatico', 'dinámico': 'dinamico' },
+      });
+      folder.addBinding(t, 'x', { min: -8, max: 8, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'y', { min: -8, max: 8, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'z', { min: -8, max: 8, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'rotX', { label: 'rotación X', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'rotY', { label: 'rotación Y', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'rotZ', { label: 'rotación Z', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'escalaX', { label: 'escala X', min: 0.05, max: 4, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'escalaY', { label: 'escala Y', min: 0.05, max: 4, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'escalaZ', { label: 'escala Z', min: 0.05, max: 4, step: 0.01 }).on('change', sucio);
+      folder.addButton({ title: '⧉ Duplicar actor' }).on('click', () => this.duplicar(def));
       folder.addButton({ title: '✕ Quitar del escenario' }).on('click', () => this.quitar(def));
 
-      this.vivos.push({ def, salon, envoltura, folder });
+      this.vivos.push(vivo);
+      // Incluso un actor estático necesita un primer pase para configurar sus
+      // uniforms y hornear la geometría derivada de la ficha.
+      salon.update(0, 0, def.ficha.params);
+      this.aplicarTransform(vivo);
     } catch (err) {
       console.error(`No se pudo montar el actor «${def.ficha.nombre}»:`, err);
     }
   }
 
-  private quitar(def: ActorDef): void {
-    this.defs = this.defs.filter((d) => d !== def);
-    const vivo = this.vivos.find((v) => v.def === def);
+  private duplicar(def: ActorEscena): void {
+    const copia: ActorEscena = {
+      ...def,
+      id: crypto.randomUUID(),
+      ficha: { ...def.ficha, nombre: `${def.ficha.nombre} copia`, params: { ...def.ficha.params } },
+      transform: { ...def.transform, x: def.transform.x + 0.4 },
+    };
+    this.documento.actores.push(copia);
+    if (this.escena) this.montar(copia);
+  }
+
+  private quitar(def: ActorEscena): void {
+    this.documento.actores = this.documento.actores.filter((d) => d.id !== def.id);
+    const vivo = this.vivos.find((v) => v.def.id === def.id);
     if (vivo) this.desmontar(vivo);
-    this.vivos = this.vivos.filter((v) => v.def !== def);
+    this.vivos = this.vivos.filter((v) => v.def.id !== def.id);
   }
 
   private desmontar(vivo: ActorVivo): void {
@@ -116,15 +155,25 @@ export class EscenarioSalon implements Salon {
   update(dt: number, tiempo: number, p: Params): void {
     this.raiz.rotation.y += (p.giro ?? 0) * dt;
     for (const v of this.vivos) {
-      v.salon.update(dt, tiempo, v.def.ficha.params);
-      const t = v.def.transform;
-      v.envoltura.position.set(t.x, t.y, t.z);
-      v.envoltura.rotation.y = t.rotY;
-      v.envoltura.scale.setScalar(t.escala);
+      if (v.transformSucio) this.aplicarTransform(v);
+      if (!v.def.visible) continue;
+      if (v.def.actividad === 'dinamico') v.salon.update(dt, tiempo, v.def.ficha.params);
     }
   }
 
+  private aplicarTransform(vivo: ActorVivo): void {
+    const { def, envoltura } = vivo;
+    const t = def.transform;
+    envoltura.visible = def.visible;
+    envoltura.position.set(t.x, t.y, t.z);
+    envoltura.rotation.set(t.rotX, t.rotY, t.rotZ);
+    envoltura.scale.set(t.escalaX, t.escalaY, t.escalaZ);
+    envoltura.updateMatrix();
+    vivo.transformSucio = false;
+  }
+
   dispose(escena: THREE.Scene): void {
+    this.generacionMontaje++;
     for (const v of this.vivos) this.desmontar(v);
     this.vivos = [];
     escena.remove(this.raiz);
@@ -133,27 +182,34 @@ export class EscenarioSalon implements Salon {
     this.pane = null;
     this.contenedor = null;
     this.escena = null;
-    // this.defs se conserva: la composición sigue ahí al volver
+    // El documento se conserva: la composición sigue ahí al volver.
   }
 
   // ————— Escenas como fichas —————
 
   /** La partitura de la escena viaja dentro de la ficha (campo extra). */
   estadoExtra(): unknown {
-    return { version: 1, actores: this.defs.map((d) => ({ ficha: d.ficha, transform: { ...d.transform } })) };
+    this.documento.camara = {
+      posicion: this.camara.position.toArray() as [number, number, number],
+      objetivo: [...this.documento.camara.objetivo],
+      fov: this.camara.fov,
+    };
+    return structuredClone(this.documento);
   }
 
   /** Restaura una escena guardada: reemplaza la composición actual. */
   cargarEstadoExtra(extra: unknown): void {
-    const datos = extra as { actores?: { ficha: FichaParaSalon; transform: Transform }[] } | undefined;
-    if (!datos?.actores) return;
+    const documento = migrarDocumentoEscena(extra);
+    if (!documento) return;
+    this.generacionMontaje++;
     for (const v of this.vivos) this.desmontar(v);
     this.vivos = [];
-    this.defs = datos.actores.map((a) => ({
-      ficha: { salonId: a.ficha.salonId, nombre: a.ficha.nombre, params: { ...a.ficha.params } },
-      transform: { ...a.transform },
-    }));
-    if (this.escena) for (const def of this.defs) this.montar(def);
+    this.documento = documento;
+    this.camara.position.fromArray(documento.camara.posicion);
+    this.camara.fov = documento.camara.fov;
+    this.camara.lookAt(...documento.camara.objetivo);
+    this.camara.updateProjectionMatrix();
+    if (this.escena) this.montarProgresivo(this.documento.actores);
   }
 
   // ————— Exportador: HTML autocontenido que reconstruye la escena —————
@@ -163,11 +219,16 @@ export class EscenarioSalon implements Salon {
   exportar(p: Params): string {
     const escena = {
       giro: p.giro ?? 0,
-      actores: this.defs.map((d) => ({
+      actores: this.documento.actores.map((d) => ({
         salon: d.ficha.salonId,
         nombre: d.ficha.nombre,
         params: d.ficha.params,
-        transform: d.transform,
+        transform: {
+          x: d.transform.x, y: d.transform.y, z: d.transform.z,
+          rotX: d.transform.rotX, rotY: d.transform.rotY, rotZ: d.transform.rotZ,
+          escalaX: d.transform.escalaX, escalaY: d.transform.escalaY, escalaZ: d.transform.escalaZ,
+        },
+        visible: d.visible,
       })),
     };
     return PLANTILLA_ESCENA.replaceAll('__ESCENA__', JSON.stringify(escena));
@@ -259,8 +320,9 @@ for (const actor of E.actores){
   const envoltura = new THREE.Group();
   const t = actor.transform;
   envoltura.position.set(t.x, t.y, t.z);
-  envoltura.rotation.y = t.rotY;
-  envoltura.scale.setScalar(t.escala);
+  envoltura.rotation.set(t.rotX ?? 0, t.rotY ?? 0, t.rotZ ?? 0);
+  envoltura.scale.set(t.escalaX ?? 1, t.escalaY ?? 1, t.escalaZ ?? 1);
+  envoltura.visible = actor.visible !== false;
   envoltura.add(figura);
   raiz.add(envoltura);
   animados.push({ figura, giro: P.giro ?? 0 });

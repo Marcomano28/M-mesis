@@ -44,7 +44,7 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria` y `motorLFO
 
 ## 3. Coleccionar (las fichas)
 
-- **☆ Guardar ficha** (panel del salón) → nombre → se guarda miniatura + todos los parámetros exactos, incluida la pestaña activa. Persiste entre sesiones (IndexedDB).
+- **☆ Guardar ficha** (panel del salón) → el diálogo de MIA pide nombre → se guarda miniatura + todos los parámetros exactos, incluida la pestaña activa. Persiste entre sesiones (IndexedDB).
 - **🗂 Fichas** (abajo derecha) abre la cajonera:
   - **Clic en la card** → recarga la figura idéntica (activa su salón y ajusta el panel).
   - **➕** → la manda al Escenario como actor.
@@ -57,9 +57,11 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria` y `motorLFO
 ## 4. Componer (el Escenario)
 
 1. Cajonera → **➕** en las fichas que quieras (el Escenario se activa solo).
-2. Panel **🎭 Actores**: cada actor tiene folder con **x / y / z / rotación / escala** y «✕ Quitar».
+2. Panel **🎭 Actores**: cada actor tiene identidad estable, nombre, visibilidad, **x / y / z**, rotación XYZ, escala XYZ, duplicar y quitar.
+   - **estático (ahorra)** configura la figura una vez y deja de evaluarla cada frame.
+   - **dinámico** mantiene vivo el `update()` del camerino: úsalo si gira, respira, reacciona o evoluciona.
 3. **giro global** (panel derecho) rota la escena entera; si una ficha lleva `giro` propio, ese actor se anima solo.
-4. La composición **persiste** aunque salgas del Escenario y vuelvas.
+4. La composición **persiste** aunque salgas del Escenario y vuelvas. Al restaurar una escena, los actores entran progresivamente —uno por frame— para evitar un bloqueo largo.
 5. **☆ Guardar ficha** estando en el Escenario = guarda **la escena completa** (actores + transforms + miniatura). Clic en esa card después = la escena vuelve entera (reemplaza la composición actual).
 
 **Ruta corta:** `🗂 → ➕➕➕ → acomodar en 🎭 → ☆ para congelar la escena`

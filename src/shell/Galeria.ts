@@ -8,6 +8,7 @@ import type { Engine } from '../core/Engine';
 import { AlmacenFichas, type Ficha } from '../core/Fichas';
 import { crearPanel } from './Paneles';
 import { Cajonera } from './Cajonera';
+import { pedirTexto } from './DialogoTexto';
 
 export class Galeria {
   private activo: Salon | null = null;
@@ -80,7 +81,10 @@ export class Galeria {
   private async guardarFicha(): Promise<void> {
     const salon = this.activo;
     if (!salon) return;
-    const nombre = prompt('Nombre de la ficha:', salon.nombre);
+    const nombre = await pedirTexto(
+      salon.id === 'escenario' ? 'Nombre de la puesta en escena' : 'Nombre del personaje',
+      salon.nombre,
+    );
     if (!nombre) return;
     const ficha: Ficha = {
       id: crypto.randomUUID(),
