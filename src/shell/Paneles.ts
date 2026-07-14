@@ -80,6 +80,12 @@ export function crearPanel(salon: Salon, bus: ParamBus, extras?: PanelExtras): P
 function descargar(nombre: string, contenido: string, tipo: string): void {
   const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
   const a = Object.assign(document.createElement('a'), { href: url, download: nombre });
+  // Algunos navegadores no alcanzan a consumir la URL si se revoca en la
+  // misma pila del click. Montar el enlace y liberarlo en el siguiente turno
+  // hace la descarga fiable sin conservar blobs innecesariamente.
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

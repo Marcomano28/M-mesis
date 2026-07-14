@@ -30,15 +30,17 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 
 | # | Estado | Prueba | Esperado |
 |---|---|---|---|
-| P1 | 🟡 | Dos actores de familias diferentes | Conviven sin alterar materiales o parámetros entre sí |
-| P2 | 🟡 | Transform XYZ completo | Posición, rotación y escala por eje responden y persisten |
-| P3 | 🟡 | Visibilidad | Ocultar detiene dibujo/actualización; mostrar recupera el actor |
+| P1 | ✅ | Dos actores de familias diferentes | Delaunay + Formas Exóticas convivieron sin errores ni contaminación visible |
+| P2 | ✅ | Transform XYZ completo | `x = 0.10` reapareció después de guardar, salir y restaurar |
+| P3 | ✅ | Visibilidad | Aria se guardó oculta y reapareció oculta al restaurar |
 | P4 | 🟡 | Estático frente a dinámico | Estático se congela; dinámico conserva giro/evolución |
-| P5 | 🟡 | Guardar, salir y restaurar escena v2 | Reaparecen reparto, nombres, transforms, visibilidad y actuación |
+| P5 | ✅ | Guardar, salir y restaurar escena v2 | Reaparecieron reparto, nombre, transform, visibilidad y actuación estática |
 | P6 | 🟡 | Cargar una escena v1 existente | Migra posición, rotación Y y escala uniforme sin error |
-| P7 | 🟡 | Escena con 10 actores | Entrada progresiva; no hay bloqueo largo ni crecimiento anormal de memoria |
-| P8 | 🟡 | Entrar/salir del Escenario tres veces | Sin duplicados, actores fantasma ni paneles repetidos |
-| P9 | 🟡 | Exportar escena con transforms XYZ | El HTML conserva posición, rotación, escala y visibilidad |
+| P7 | 🟡 | Escena con 10 actores | Los 10 terminaron de montar sin errores; falta valorar fluidez y memoria en Chrome |
+| P8 | ✅ | Entrar/salir del Escenario tres veces | 10 actores exactos en los tres ciclos; sin duplicados, fantasmas ni errores |
+| P9 | 🟡 | Exportar escena con transforms XYZ | Corregida liberación prematura del Blob; descarga pendiente de verificar fuera del navegador integrado |
+
+**Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 requiere abrir el HTML descargado. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
 ### No probar todavía como funcionalidad terminada
 
@@ -56,6 +58,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | Fecha | Rama/commit | Alcance | Resultado |
 |---|---|---|---|
 | 14-07-2026 | `codex/escenario-v2` · `9d659a1` | Documento v2, diálogo, alta y duplicación de actores, guardado básico | Base técnica ✅ · ronda visual P1–P9 pendiente |
+| 14-07-2026 | `codex/escenario-v2` | P1–P9: dos familias, persistencia, 10 actores, 3 reentradas y export | P1/P2/P3/P5/P8 ✅ · P4/P6/P7/P9 🟡 |
 
 ---
 
