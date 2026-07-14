@@ -3,6 +3,7 @@
 
 *Versión 2.1 — Julio 2026 · sustituye a la v1.0 ("Galería viva")*
 *Ruta de acciones del taller: ver **GUIA_DE_USO.md***
+*Fundamento conceptual y plano del templo: ver **BIBLIA_CONCEPTUAL.md** (este plan ejecuta; la biblia orienta)*
 
 ---
 
@@ -118,17 +119,51 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 - ~~Escenas guardadas como fichas~~ ✅ · ~~Export HTML del Escenario~~ ✅ v1
 - Pulidos pendientes: sincronizar el selector de salón al cargar fichas; tamaño de punto en WebGPU (sprites instanciados); GLB dentro de fichas (binario en IndexedDB); actores GLB en el export.
 
-**Fase B — Respiración (antesala del instrumento)** — en curso
-- ~~LFOs en el ParamBus~~ ✅ — plano de modulación funcionando; la guitarra escribirá en este mismo plano.
-- **Moduladores en fichas**: guardar los LFOs dentro de la ficha/escena (hoy viven solo en la sesión).
-- **Modular transforms de actores**: rutear x/y/z/rotY/escala del Escenario por el bus para que también respiren.
-- **Grabación de gestos**: grabar el movimiento de sliders y reproducirlo.
-- **Sincronía musical**: tempo global (BPM) y frecuencias como ratios (1/2, 1/4…) en vez de Hz sueltos.
+### Las etapas del templo (implementación de la BIBLIA_CONCEPTUAL)
 
-**Fase C — Poblar el taller**
-- Salones 4–8, priorizando **Materia de Puntos** (compute shaders TSL; tu cascada de 20k puntos → millones GPU-residentes).
+Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban con LFOs y ratón como fuentes falsas — toda la dramaturgia se valida en seco); las 4–6 traen el oído; la 7 necesita historia que leer; la 8 refina. Cada etapa deja el taller usable.
 
-**Fase D — El instrumento (Acto II)** · *diseño en tres niveles*
+**Etapa 1 — Acumuladores de Frase** ✅ *(la primera memoria)*
+- Fuentes internas que integran historia: tensión (energía acumulada con fuga), densidad (eventos/seg), meseta (tiempo sin cambio significativo). Escriben en el plano de modulación como cualquier LFO; panel con monitores.
+- Sin audio: se alimentan de la actividad de los LFOs y del ratón.
+- *Criterio de éxito:* una figura que responde a la **historia** de una señal, no a su instante — se ve la diferencia a ojo.
+
+**Etapa 2 — El Barniz v1** *(la gramática estética)*
+- Ficha de barniz: paleta (rangos), gramática de movimiento (suavizados globales asimétricos), materia (vistas/grano), presupuesto de caos. Aplicable sobre cualquier salón o escena; slider de interpolación entre dos barnices.
+- Incluye pendientes heredados: moduladores guardados en fichas; transforms de actores ruteados por el bus.
+- *Criterio:* la misma escena atravesando dos barnices produce dos mundos reconocibles.
+
+**Etapa 3 — El protocolo de la Semilla** *(la dramaturgia)*
+- Máquina de etapas dimensionales (silencio→punto→línea→curva→superficie→volumen→constelación) como **presupuesto de manifestación** global (diafragma sobre el vocabulario visual, no escenas separadas). Germinación primero manual (slider), luego automática vía acumuladores de Etapa 1. Reversible. Modo actuación (fullscreen sin UI).
+- *Criterio:* un viaje completo de 3 minutos conducido solo con LFOs que se sienta narrado, no agitado.
+
+**Etapa 4 — El oído crudo** *(entra la guitarra)*
+- Web Audio + AudioWorklet + Meyda: RMS, centroide, flatness, onsets. Web MIDI si hay pastilla. **Calibración por sesión** (los rangos de TU guitarra). Monitor de rasgos en panel + medición de latencia real en tu máquina (el veredicto navegador vs. Tauri se toma aquí, con números).
+- *Criterio:* rasgos visibles en vivo; onset→pulso visual sintiéndose instantáneo.
+
+**Etapa 5 — La Matriz de Mapeo** *(el oído aprende a traducir)*
+- UI fuentes × destinos: curva, rango y suavizado asimétrico por celda; mapeos 1:N y N:1. Fuentes: rasgos (Et. 4) + acumuladores (Et. 1). Fichas de sinestesia (la matriz se guarda/carga). **Presets anclados en la matemática compartida** (§II.4 de la biblia: intervalos↔proporciones, m como simetría).
+- *Criterio:* cambiar de ficha de sinestesia en vivo transforma el carácter del viaje sin tocar código.
+
+**Etapa 6 — Los Gestos** *(el vocabulario del músico)*
+- Capa artesanal sobre f0/envolvente: pitch estable (YIN/Essentia), vibrato (oscilación 5–7Hz sobre f0 → frecuencia+profundidad), staccato/legato, bends. Cada gesto = fuente nueva en la matriz.
+- *Criterio:* el vibrato del guitarrista mueve visiblemente algo que la energía sola no mueve.
+
+**Etapa 7 — El Narrador v1** *(el órgano del tiempo)*
+- Máquina de estados **legible**: lee acumuladores + historial de gestos; decide transiciones de la Semilla, cambios de universo (fichas/escenas), transiciones de Barniz y presupuesto de densidad. Iniciativa acotada con cooldown (propuestas que invitan a responder). **Bitácora en pantalla**: cada decisión del Narrador se muestra en texto — la legibilidad es requisito, no lujo.
+- *Criterio:* en una improvisación de 10 minutos, el músico siente que "el sistema entendió la pieza" — y puede leer en la bitácora por qué hizo lo que hizo.
+
+**Etapa 8 — El dueto profundo (IA pequeña)** *(v2 de todo)*
+- Clasificadores de articulación entrenados con tus ejemplos (TF.js, ~30 muestras por clase). Embeddings de timbre → navegación continua entre fichas. Narrador entrenado con tus preferencias (cuándo TÚ habrías cambiado de escena). Empaquetado Tauri si la Etapa 4 midió latencias molestas.
+- *Criterio:* el sistema distingue tu palm mute de tu legato y cada uno abre una puerta visual distinta.
+
+*Herederos menores (se cuelan donde quepan):* grabación de gestos de sliders; sincronía BPM/ratios en LFOs (natural en Etapa 5); pulidos de Fase A.
+
+**Vía paralela — Poblar el taller** *(no bloquea ninguna etapa; se intercala cuando apetezca)*
+- Salones nuevos, priorizando **Materia de Puntos** (compute shaders TSL; tu cascada de 20k puntos → millones GPU-residentes). Cada salón nuevo enriquece automáticamente fichas, Escenario, moduladores y — llegado el momento — la matriz.
+- Notas de referencia (IQ): **Campos y Ruido** con H de Hurst expuesto como slider (fBM ya implementado en 1D para LFOs; llevarlo a 2D/3D en shader); **Líneas y Trazos** con AABBs de Béziers ([bboxes2d](https://iquilezles.org/articles/bboxes2d/)) para culling de curvas en masa; el mismo culling servirá al Escenario con decenas de actores. Mapeo futuro: pendiente espectral del timbre → H (ver biblia §II.4).
+
+### Referencia de diseño del instrumento · *tres niveles (soporta las Etapas 4–8)*
 
 *Nivel 1 — Extracción (señal → rasgos → gestos).* Jerarquía por escala temporal:
 - **Rasgos instantáneos** (~10ms, salen de librería): energía/RMS, pitch f0 (YIN), centroide espectral (brillo), flatness (rugosidad), onsets. Stack: Web Audio + AudioWorklet, Meyda para empezar → Essentia.js (WASM) cuando haga falta MIR serio. Web MIDI si hay pastilla.
