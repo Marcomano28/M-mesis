@@ -44,6 +44,8 @@ Esto es una **hipótesis operativa, no dogma**: se prueba con espectadores reale
 
 **5. La máquina interpreta, nunca autora.** Todo lo que aparece en pantalla fue creado por el autor (las fichas, las gramáticas, los salones). El sistema — incluido cualquier agente o modelo — solo elige, gradúa, combina y ordena en el tiempo ese vocabulario. Es un director de orquesta con la partitura del autor, jamás un pintor propio. (Por eso se descartó la generación end-to-end: disuelve el lenguaje decantado durante años.)
 
+Una posible encarnación futura de este principio es el **Director de Escena**: un modelo provisto de la caja de herramientas de MIA que lee la estructura musical y propone una puesta en escena con el reparto ya creado. No inventa personajes ni píxeles; escribe un guion inspeccionable de entradas, gestos, relaciones sonoras, luces, cámaras, vestuario y silencios. Su criterio se conversa y su partitura siempre puede editarse, rechazarse o reinterpretarse.
+
 ---
 
 ## III. La ontogénesis visual — el protocolo de la semilla

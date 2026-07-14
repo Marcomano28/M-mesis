@@ -157,6 +157,15 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - Clasificadores de articulación entrenados con tus ejemplos (TF.js, ~30 muestras por clase). Embeddings de timbre → navegación continua entre fichas. Narrador entrenado con tus preferencias (cuándo TÚ habrías cambiado de escena). Empaquetado Tauri si la Etapa 4 midió latencias molestas.
 - *Criterio:* el sistema distingue tu palm mute de tu legato y cada uno abre una puerta visual distinta.
 
+**Horizonte — El Director de Escena (modelo + skill de MIA)** *(idea deliberadamente abierta)*
+- Un modelo recibe una caja de herramientas limitada y explícita: consultar fichas/actores, analizar la forma musical, crear grupos, escribir pistas y cues, graduar la respuesta sonora, vestir actores, colocar luces y coreografiar cámaras.
+- Su salida no es vídeo ni código arbitrario: es un `DocumentoEscena` válido, determinista y editable con los mismos destinos que usa el timeline humano.
+- Puede proponer variantes de dirección —sobria, dramática, coral, reactiva— y explicar cada decisión: qué escucha, qué actor mueve, con qué intensidad y durante cuánto tiempo.
+- El grado de autonomía es graduable por capa: sugerir solamente; escribir un borrador; dirigir dentro de límites bloqueados por el autor; o improvisar en vivo con presupuesto de cambio y posibilidad de detenerlo.
+- El autor conserva el vocabulario y la última palabra. Actores, vestuarios y gramática visual provienen de los salones; el Director selecciona, relaciona y ordena.
+- *Condición previa:* cámara, luces, transformaciones de actor, timeline, transporte musical y rutas de modulación deben compartir un contrato direccionable y serializable. Construir bien esas herramientas es construir desde ahora la futura `skill` del Director.
+- *Criterio futuro:* dada una pieza y un reparto, produce una primera coreografía legible que el autor prefiera editar antes que comenzar desde cero, sin borrar la identidad de MIA.
+
 *Herederos menores (se cuelan donde quepan):* grabación de gestos de sliders; sincronía BPM/ratios en LFOs (natural en Etapa 5); pulidos de Fase A.
 
 **Vía paralela — Poblar el taller** *(no bloquea ninguna etapa; se intercala cuando apetezca)*

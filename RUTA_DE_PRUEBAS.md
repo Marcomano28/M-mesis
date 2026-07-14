@@ -54,6 +54,10 @@
 | E2 | Guardar/cargar escena completa | Actores restaurados |
 | E3 | ⎙ Imprimir del Escenario | HTML se genera; sin oscilación de LFOs horneada (base limpia) |
 | E4 | Imprimir un salón con LFO activo | Los valores exportados son la BASE, no el instante modulado |
+| E5 | Cargar una escena v1 guardada antes del Documento v2 | Migra: conserva posición, rotación Y y escala uniforme |
+| E6 | Actor estático vs dinámico | Estático queda visualmente congelado; dinámico conserva giro/evolución |
+| E7 | Ocultar, duplicar y transformar XYZ un actor | Visibilidad inmediata; copia independiente; rotación y escala por eje persisten al guardar/cargar |
+| E8 | Restaurar una escena con varios actores | Entran progresivamente, uno por frame; la interfaz no queda bloqueada durante todo el montaje |
 
 ## Cierre
 

@@ -25,7 +25,9 @@ await engine.init();
 // Fábricas: cómo crear instancias nuevas de cada salón (el Escenario las usa
 // para montar actores independientes a partir de fichas)
 const fabricas = {
-  supershapes: () => new SupershapesSalon(),
+  // En el escenario Formas Exóticas solo construye la familia usada por la
+  // ficha, no los cuatro camerinos completos.
+  supershapes: (params?: Record<string, number>) => new SupershapesSalon(params?.modo),
   crosshatch: () => new CrossHatchSalon(),
   bajorelieve: () => new BajoRelieveSalon(),
   delaunay: () => new DelaunaySalon(),

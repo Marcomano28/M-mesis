@@ -185,27 +185,45 @@ export class SupershapesSalon implements Salon {
   private caracolCounts = { nTh: 0, nPh: 0 };
   private caracolFase = 0;
 
+  /**
+   * Sin argumento funciona como camerino y prepara las cuatro familias.
+   * En El Escenario recibe la familia congelada de la ficha y construye solo
+   * ese actor; evita reservar las otras tres geometrías y sus materiales.
+   */
+  constructor(private modoActor?: number) {}
+
   init(escena: THREE.Scene): void {
-    this.objC = this.crearRepresentaciones(this.nodoPosClasica(), this.nodoColorClasica());
-    this.objF = this.crearRepresentaciones(this.nodoPosFlor(), this.nodoColorFlor());
-    this.objF.puntos.rotation.x = this.objF.alambre.rotation.x = this.objF.caras.rotation.x = 2.97;
-    this.objS = this.crearSerpiente();
-    for (const o of [this.objS.puntos, this.objS.alambre, this.objS.caras]) {
-      o.rotation.set(Math.PI * 0.9, Math.PI * 0.65, 0);
-      o.frustumCulled = false; // las posiciones vienen del shader: la cota CPU no las conoce
+    const quiere = (modo: number) => this.modoActor === undefined || this.modoActor === modo;
+    if (quiere(0)) {
+      this.objC = this.crearRepresentaciones(this.nodoPosClasica(), this.nodoColorClasica());
+      this.grupo.add(this.objC.puntos, this.objC.alambre, this.objC.caras);
     }
-    this.regenerarSerpiente(...this.conteosSerpiente(256)); // hornea atributos iniciales (semillas aleatorias)
-    this.objCar = this.crearCaracol();
-    for (const o of [this.objCar.puntos, this.objCar.alambre, this.objCar.caras, this.objCar.pelo, this.objCar.gotas, this.objCar.moro]) {
-      o.rotation.set(-Math.PI * 0.56, 0, Math.PI * 0.95);
-      o.frustumCulled = false;
+    if (quiere(1)) {
+      this.objF = this.crearRepresentaciones(this.nodoPosFlor(), this.nodoColorFlor());
+      this.objF.puntos.rotation.x = this.objF.alambre.rotation.x = this.objF.caras.rotation.x = 2.97;
+      this.grupo.add(this.objF.puntos, this.objF.alambre, this.objF.caras);
     }
-    this.regenerarCaracol(...this.conteosCaracol(256));
-    for (const o of [this.objC, this.objF, this.objS]) this.grupo.add(o.puntos, o.alambre, o.caras);
-    this.grupo.add(
-      this.objCar.puntos, this.objCar.alambre, this.objCar.caras,
-      this.objCar.pelo, this.objCar.gotas, this.objCar.moro,
-    );
+    if (quiere(2)) {
+      this.objS = this.crearSerpiente();
+      for (const o of [this.objS.puntos, this.objS.alambre, this.objS.caras]) {
+        o.rotation.set(Math.PI * 0.9, Math.PI * 0.65, 0);
+        o.frustumCulled = false; // las posiciones vienen del shader: la cota CPU no las conoce
+      }
+      this.regenerarSerpiente(...this.conteosSerpiente(256));
+      this.grupo.add(this.objS.puntos, this.objS.alambre, this.objS.caras);
+    }
+    if (quiere(3)) {
+      this.objCar = this.crearCaracol();
+      for (const o of [this.objCar.puntos, this.objCar.alambre, this.objCar.caras, this.objCar.pelo, this.objCar.gotas, this.objCar.moro]) {
+        o.rotation.set(-Math.PI * 0.56, 0, Math.PI * 0.95);
+        o.frustumCulled = false;
+      }
+      this.regenerarCaracol(...this.conteosCaracol(256));
+      this.grupo.add(
+        this.objCar.puntos, this.objCar.alambre, this.objCar.caras,
+        this.objCar.pelo, this.objCar.gotas, this.objCar.moro,
+      );
+    }
     escena.add(this.grupo);
     this.resActual = 0; // fuerza regeneración de retícula en el primer update
   }
@@ -319,10 +337,10 @@ export class SupershapesSalon implements Salon {
   private regenerarReticulas(res: number): void {
     this.geoC?.dispose();
     this.geoF?.dispose();
-    this.geoC = new THREE.PlaneGeometry(1, 1, res, res);
-    this.geoF = new THREE.PlaneGeometry(1, 1, res, Math.max(6, Math.round(res * 0.75)));
-    if (this.objC) this.objC.puntos.geometry = this.objC.alambre.geometry = this.objC.caras.geometry = this.geoC;
-    if (this.objF) this.objF.puntos.geometry = this.objF.alambre.geometry = this.objF.caras.geometry = this.geoF;
+    this.geoC = this.objC ? new THREE.PlaneGeometry(1, 1, res, res) : null;
+    this.geoF = this.objF ? new THREE.PlaneGeometry(1, 1, res, Math.max(6, Math.round(res * 0.75))) : null;
+    if (this.objC && this.geoC) this.objC.puntos.geometry = this.objC.alambre.geometry = this.objC.caras.geometry = this.geoC;
+    if (this.objF && this.geoF) this.objF.puntos.geometry = this.objF.alambre.geometry = this.objF.caras.geometry = this.geoF;
   }
 
   // ————— Caracol (GPU: identidad horneada, posición/color en shader) —————
