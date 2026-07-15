@@ -40,7 +40,7 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
 3. En Formas Exóticas, los controles comunes aplican a ambas variantes: **resolución** (densidad de la retícula), **exposición** (Puntos / Alambre / Caras) y **color**.
 4. Salones con modelos: **📦 Cargar modelo GLB…** abre el selector de archivos — vale cualquier .glb/.gltf de cualquier carpeta, comprimido con Draco o no. En **Trazo y Grafito**, el GLB importado queda dentro de la ficha: al guardarla, recargarla o mandarla al Escenario reaparece el mismo modelo, no el nudo de muestra.
    - Trazo y Grafito comienza sin giro. Sus controles **fondo**, **líneas** y **polaridad** permiten invertir el papel y el grafito de un gesto.
-   - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. El salón auto-orienta el relieve (su eje delgado mira a cámara). Su GLB importado viaja dentro de la ficha y reaparece como el mismo actor al añadirlo al Escenario.
+   - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. **Profundidad base** determina cuánto volumen queda sin tocar; **intensidad relieve** controla la fuerza del bump bajo el ratón; y **radio del relieve** su tamaño. El salón auto-orienta el relieve (su eje delgado mira a cámara). Su GLB importado viaja dentro de la ficha y reaparece como el mismo actor al añadirlo al Escenario.
 5. Abre **🧵 Hilos de la ficha** antes de guardar:
    - **Esenciales** recupera una selección corta recomendada por el salón.
    - **Ninguno** permite empezar de cero.
@@ -146,7 +146,7 @@ Y la promesa del Acto II: donde hoy dice 〰 LFO, mañana dirá 🎸 guitarra �
 ## 9. Problemas conocidos / trucos
 
 - **Tamaño de punto en WebGPU**: el slider `tamaño punto` solo actúa en fallback WebGL2 (los puntos WebGPU son de 1px por diseño de la API).
-- **GLB "invisible" en Bajo Relieve**: sube el slider *aplanado base* para ver el modelo completo sin estela.
+- **GLB "invisible" en Bajo Relieve**: sube *profundidad base* para ver el modelo completo sin estela; pon *intensidad relieve* a 1 para que el ratón revele el máximo volumen.
 - **La miniatura no refleja lo que ves**: la captura toma el frame actual — encuadra antes de ☆.
 - **Reset rápido de fichas**: borra la base de datos `mia-fichas` en DevTools → Application → IndexedDB.
 - **Export de la actuación**: las rutas, LFOs y acumuladores se guardan en DocumentoEscena v3 y se restauran dentro de MIA, pero todavía no se ejecutan en el HTML exportado.

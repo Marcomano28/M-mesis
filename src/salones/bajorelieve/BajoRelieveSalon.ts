@@ -41,7 +41,8 @@ export class BajoRelieveSalon implements Salon {
     { clave: 'param.escala', etiqueta: 'respiración interna', categoria: 'expresion', min: 0.2, max: 4, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], legado: true },
     { clave: 'param.giro', etiqueta: 'giro propio', categoria: 'movimiento', min: -2, max: 2, velocidad: 'gesto', coste: 'barato', afinidades: ['pulso'], legado: true },
     { clave: 'param.aplanado', etiqueta: 'profundidad del relieve', categoria: 'expresion', min: 0.005, max: 1, velocidad: 'gesto', coste: 'barato', afinidades: ['energia', 'ataque'], porDefecto: true, legado: true },
-    { clave: 'param.radio', etiqueta: 'radio de revelado', categoria: 'expresion', min: 0.02, max: 0.35, velocidad: 'gesto', coste: 'medio', afinidades: ['energia'], legado: true },
+    { clave: 'param.intensidad', etiqueta: 'intensidad del relieve', categoria: 'expresion', min: 0, max: 1, velocidad: 'gesto', coste: 'barato', afinidades: ['energia', 'ataque'], porDefecto: true, legado: true },
+    { clave: 'param.radio', etiqueta: 'radio del relieve', categoria: 'expresion', min: 0.02, max: 0.35, velocidad: 'gesto', coste: 'medio', afinidades: ['energia'], legado: true },
     { clave: 'param.estela', etiqueta: 'memoria de estela', categoria: 'expresion', min: 0.002, max: 0.2, velocidad: 'frase', coste: 'medio', afinidades: ['textura'], legado: true },
     { clave: 'param.ciclo', etiqueta: 'ciclo de paleta', categoria: 'material', min: 0.5, max: 6, velocidad: 'frase', coste: 'barato', afinidades: ['armonia'], legado: true },
     { clave: 'param.tono', etiqueta: 'tono de paleta', categoria: 'material', min: -1, max: 1, velocidad: 'frase', coste: 'barato', afinidades: ['armonia', 'brillo'], porDefecto: true, legado: true },
@@ -57,8 +58,9 @@ export class BajoRelieveSalon implements Salon {
     {
       titulo: 'Relieve',
       params: [
-        { clave: 'aplanado', etiqueta: 'aplanado base',   valor: 0.03,  min: 0.005, max: 1 },
-        { clave: 'radio',    etiqueta: 'radio estela',    valor: 0.1,   min: 0.02,  max: 0.35 },
+        { clave: 'aplanado', etiqueta: 'profundidad base',      valor: 0.03, min: 0.005, max: 1 },
+        { clave: 'intensidad', etiqueta: 'intensidad relieve', valor: 1,    min: 0,     max: 1 },
+        { clave: 'radio',    etiqueta: 'radio del relieve',     valor: 0.1,  min: 0.02,  max: 0.35 },
         { clave: 'estela',   etiqueta: 'desvanecimiento', valor: 0.02,  min: 0.002, max: 0.2 },
         { clave: 'ciclo',    etiqueta: 'ciclo paleta',    valor: 2.883, min: 0.5,   max: 6 },
         { clave: 'tono',     etiqueta: 'tono paleta',     valor: 0,     min: -1,    max: 1 },
@@ -76,6 +78,7 @@ export class BajoRelieveSalon implements Salon {
 
   private u = {
     aplanado: uniform(0.03),
+    intensidad: uniform(1),
     ciclo: uniform(2.883),
     tono: uniform(0),
     opacidad: uniform(0.6),
@@ -128,6 +131,7 @@ export class BajoRelieveSalon implements Salon {
     this.texturaEstela.needsUpdate = true;
 
     this.u.aplanado.value = p.aplanado ?? 0.03;
+    this.u.intensidad.value = p.intensidad ?? 1;
     this.u.ciclo.value = p.ciclo ?? 2.883;
     this.u.tono.value = p.tono ?? 0;
     this.u.opacidad.value = p.opacidad ?? 0.6;
@@ -182,7 +186,9 @@ export class BajoRelieveSalon implements Salon {
       const s = ndc.xy.div(ndc.w).add(1.0).div(2.0);
       uvPantalla.assign(vec2(s.x, s.y.oneMinus()));
       const extrude = texture(this.texturaEstela, uvPantalla).r;
-      pos.z.mulAssign(mix(this.u.aplanado, 1.0, extrude));
+      // El radio define dónde actúa el ratón; la intensidad decide cuánto
+      // recupera el volumen original dentro de esa zona revelada.
+      pos.z.mulAssign(mix(this.u.aplanado, 1.0, extrude.mul(this.u.intensidad)));
       return pos;
     })();
     return { posicion, uvPantalla };
