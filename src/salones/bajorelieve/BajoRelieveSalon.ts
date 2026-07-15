@@ -14,13 +14,24 @@ import {
 } from 'three/tsl';
 import { crearLoaderGLB, elegirYCargarGLB } from '../../core/CargadorGLB';
 import { Estela } from './Estela';
-import type { Salon, Params, ParamDef, Pestana, Accion } from '../../core/Salon';
+import type { Salon, Params, ParamDef, Pestana, Accion, HiloFichaDef } from '../../core/Salon';
 
 const MODELO_DEFECTO = '/relieve.glb'; // vive en public/
 
 export class BajoRelieveSalon implements Salon {
   id = 'bajorelieve';
   nombre = 'Bajo Relieve';
+
+  hilosFicha: HiloFichaDef[] = [
+    { clave: 'param.escala', etiqueta: 'respiración interna', categoria: 'expresion', min: 0.2, max: 4, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], legado: true },
+    { clave: 'param.giro', etiqueta: 'giro propio', categoria: 'movimiento', min: -2, max: 2, velocidad: 'gesto', coste: 'barato', afinidades: ['pulso'], legado: true },
+    { clave: 'param.aplanado', etiqueta: 'profundidad del relieve', categoria: 'expresion', min: 0.005, max: 1, velocidad: 'gesto', coste: 'barato', afinidades: ['energia', 'ataque'], porDefecto: true, legado: true },
+    { clave: 'param.radio', etiqueta: 'radio de revelado', categoria: 'expresion', min: 0.02, max: 0.35, velocidad: 'gesto', coste: 'medio', afinidades: ['energia'], legado: true },
+    { clave: 'param.estela', etiqueta: 'memoria de estela', categoria: 'expresion', min: 0.002, max: 0.2, velocidad: 'frase', coste: 'medio', afinidades: ['textura'], legado: true },
+    { clave: 'param.ciclo', etiqueta: 'ciclo de paleta', categoria: 'material', min: 0.5, max: 6, velocidad: 'frase', coste: 'barato', afinidades: ['armonia'], legado: true },
+    { clave: 'param.tono', etiqueta: 'tono de paleta', categoria: 'material', min: -1, max: 1, velocidad: 'frase', coste: 'barato', afinidades: ['armonia', 'brillo'], porDefecto: true, legado: true },
+    { clave: 'param.opacidad', etiqueta: 'opacidad de alambre', categoria: 'material', min: 0.05, max: 1, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], legado: true },
+  ];
 
   params: ParamDef[] = [
     { clave: 'escala', etiqueta: 'escala', valor: 1,  min: 0.2, max: 4 },

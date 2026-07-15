@@ -99,6 +99,7 @@ function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
     salonId: ficha.salonId,
     nombre: ficha.nombre,
     params: { ...ficha.params },
+    hilos: ficha.hilos?.map((hilo) => ({ ...hilo, afinidades: [...hilo.afinidades] })),
     extra: ficha.extra === undefined ? undefined : structuredClone(ficha.extra),
   };
 }

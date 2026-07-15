@@ -2,7 +2,10 @@
 // Al cambiar de salón: dispose del anterior, init del nuevo, panel regenerado.
 
 import { Pane } from 'tweakpane';
-import type { Salon, HiloModulable } from '../core/Salon';
+import {
+  catalogoHilosFicha, hilosInicialesFicha, hilosLegadoFicha, materializarHilos,
+  type Salon, type HiloModulable, type FichaParaSalon,
+} from '../core/Salon';
 import type { ParamBus } from '../core/ParamBus';
 import type { Engine } from '../core/Engine';
 import { AlmacenFichas, type Ficha } from '../core/Fichas';
@@ -16,6 +19,10 @@ export class Galeria {
   private almacen = new AlmacenFichas();
   private cajonera: Cajonera;
   private nombresSalon: Map<string, string>;
+  private seleccionHilos = new Map<string, Set<string>>();
+  private escuchasDestinos = new Set<() => void>();
+  private selectorPane: Pane | null = null;
+  private selectorEstado = { salon: '' };
 
   constructor(
     private salones: Salon[],
@@ -29,7 +36,7 @@ export class Galeria {
       alEscenario: salones.some((s) => s.recibirFicha)
         ? (f) => {
             this.activar('escenario');
-            this.activo?.recibirFicha?.(f);
+            this.activo?.recibirFicha?.(this.fichaPreparada(f));
           }
         : undefined,
     });
@@ -46,20 +53,33 @@ export class Galeria {
   destinosModulables(): HiloModulable[] {
     const salon = this.activo;
     if (!salon) return [];
-    const defs = [...salon.params, ...(salon.pestanas ?? []).flatMap((p) => p.params)];
-    const propios = defs
-      .filter((d) => d.tipo !== 'color' && !d.opciones)
-      .map((d) => ({
-        etiqueta: `${salon.nombre} · ${d.etiqueta}`,
-        dir: `${salon.id}.${d.clave}`,
-        min: d.min,
-        max: d.max,
-      }));
+    const catalogo = catalogoHilosFicha(salon);
+    const seleccion = this.obtenerSeleccion(salon);
+    const propios = catalogo.length
+      ? catalogo
+          .filter((hilo) => seleccion.has(hilo.clave) && hilo.clave.startsWith('param.'))
+          .map((hilo) => ({
+            etiqueta: `${salon.nombre} · ${hilo.etiqueta}`,
+            dir: `${salon.id}.${hilo.clave.slice('param.'.length)}`,
+            min: hilo.min,
+            max: hilo.max,
+          }))
+      : [...salon.params, ...(salon.pestanas ?? []).flatMap((p) => p.params)]
+          .filter((d) => d.tipo !== 'color' && !d.opciones)
+          .map((d) => ({ etiqueta: `${salon.nombre} · ${d.etiqueta}`, dir: `${salon.id}.${d.clave}`, min: d.min, max: d.max }));
     return [...propios, ...(salon.hilosModulables?.() ?? [])];
   }
 
+  onCambioDestinos(fn: () => void): () => void {
+    this.escuchasDestinos.add(fn);
+    return () => this.escuchasDestinos.delete(fn);
+  }
+
   activar(id: string): void {
-    if (this.activo?.id === id) return;
+    if (this.activo?.id === id) {
+      this.sincronizarSelector(id);
+      return;
+    }
     const salon = this.salones.find((s) => s.id === id);
     if (!salon) return;
 
@@ -72,6 +92,8 @@ export class Galeria {
       salon.init(this.engine.escena, this.engine.camara);
       this.reconstruirPanel(salon);
       this.activo = salon;
+      this.sincronizarSelector(id);
+      this.emitirCambioDestinos();
     } catch (err) {
       console.error(`Fallo al activar el salón «${salon.nombre}»:`, err);
     }
@@ -94,6 +116,9 @@ export class Galeria {
       params: this.bus.baseDeSalon(salon.id), // la base, sin oscilación de LFOs
       miniatura: await this.engine.capturar(),
       fecha: Date.now(),
+      hilos: salon.hilosFicha ? materializarHilos(
+        catalogoHilosFicha(salon).filter((hilo) => this.obtenerSeleccion(salon).has(hilo.clave)),
+      ) : undefined,
       extra: salon.estadoExtra?.(),
     };
     await this.almacen.guardar(ficha);
@@ -105,6 +130,10 @@ export class Galeria {
     if (!salon) {
       console.error(`La ficha «${ficha.nombre}» pertenece a un salón inexistente (${ficha.salonId}).`);
       return;
+    }
+    if (salon.hilosFicha) {
+      const hilos = ficha.hilos ?? hilosLegadoFicha(salon);
+      this.seleccionHilos.set(salon.id, new Set(hilos.map((hilo) => hilo.clave)));
     }
     // Volcar los parámetros al bus ANTES de construir el panel, que los respeta
     for (const [clave, valor] of Object.entries(ficha.params)) {
@@ -118,6 +147,7 @@ export class Galeria {
     }
     // Estado extra (p.ej. una escena completa restaura sus actores)
     if (ficha.extra !== undefined) this.activo?.cargarEstadoExtra?.(ficha.extra);
+    this.emitirCambioDestinos();
   }
 
   private async borrarFicha(id: string): Promise<void> {
@@ -130,9 +160,34 @@ export class Galeria {
   }
 
   private reconstruirPanel(salon: Salon): void {
+    const catalogo = catalogoHilosFicha(salon);
     this.panel = crearPanel(salon, this.bus, {
       alGuardarFicha: () => { void this.guardarFicha(); },
+      hilosFicha: catalogo.length ? {
+        catalogo,
+        seleccion: this.obtenerSeleccion(salon),
+        alCambiar: () => this.emitirCambioDestinos(),
+      } : undefined,
     });
+  }
+
+  private obtenerSeleccion(salon: Salon): Set<string> {
+    let seleccion = this.seleccionHilos.get(salon.id);
+    if (!seleccion && salon.hilosFicha) {
+      seleccion = new Set(hilosInicialesFicha(salon).map((hilo) => hilo.clave));
+      this.seleccionHilos.set(salon.id, seleccion);
+    }
+    return seleccion ?? new Set<string>();
+  }
+
+  private fichaPreparada(ficha: Ficha): FichaParaSalon {
+    if (ficha.hilos) return ficha;
+    const salon = this.salones.find((s) => s.id === ficha.salonId);
+    return salon?.hilosFicha ? { ...ficha, hilos: hilosLegadoFicha(salon) } : ficha;
+  }
+
+  private emitirCambioDestinos(): void {
+    for (const fn of this.escuchasDestinos) fn();
   }
 
   // ————— Selector de salón (arriba a la izquierda) —————
@@ -142,13 +197,18 @@ export class Galeria {
     contenedor.style.cssText = 'position:fixed;top:8px;left:8px;width:240px;z-index:10';
     document.body.appendChild(contenedor);
 
-    const pane = new Pane({ container: contenedor, title: 'MIA — Galería' });
-    const estado = { salon: this.salones[0].id };
-    pane
-      .addBinding(estado, 'salon', {
+    this.selectorPane = new Pane({ container: contenedor, title: 'MIA — Galería' });
+    this.selectorEstado.salon = this.salones[0].id;
+    this.selectorPane
+      .addBinding(this.selectorEstado, 'salon', {
         label: 'salón',
         options: Object.fromEntries(this.salones.map((s) => [s.nombre, s.id])),
       })
       .on('change', (ev: { value: string }) => this.activar(ev.value));
+  }
+
+  private sincronizarSelector(id: string): void {
+    this.selectorEstado.salon = id;
+    this.selectorPane?.refresh();
   }
 }

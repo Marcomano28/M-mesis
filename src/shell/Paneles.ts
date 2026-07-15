@@ -3,11 +3,16 @@
 // Si el salón declara pestañas, cada una es un modo; la activa llega como `<id>.modo`.
 
 import { Pane } from 'tweakpane';
-import type { Salon, ParamDef } from '../core/Salon';
+import type { Salon, ParamDef, HiloFichaDef } from '../core/Salon';
 import type { ParamBus } from '../core/ParamBus';
 
 export interface PanelExtras {
   alGuardarFicha?: () => void;
+  hilosFicha?: {
+    catalogo: HiloFichaDef[];
+    seleccion: Set<string>;
+    alCambiar: () => void;
+  };
 }
 
 export function crearPanel(salon: Salon, bus: ParamBus, extras?: PanelExtras): Pane {
@@ -55,6 +60,57 @@ export function crearPanel(salon: Salon, bus: ParamBus, extras?: PanelExtras): P
     tab.on('select', (ev: { index: number }) => {
       if (ev.index >= 0) bus.set(dirModo, ev.index);
     });
+  }
+
+  // — Hilos que viajarán con la ficha —
+  if (extras?.hilosFicha?.catalogo.length) {
+    const { catalogo, seleccion, alCambiar } = extras.hilosFicha;
+    const carpeta = pane.addFolder({ title: '🧵 Hilos de la ficha', expanded: false });
+    const estado: Record<string, boolean> = {};
+    const resumen = { activos: '' };
+    const refrescarResumen = () => {
+      resumen.activos = `${seleccion.size} de ${catalogo.length}`;
+      carpeta.refresh();
+      alCambiar();
+    };
+    carpeta.addBinding(resumen, 'activos', { label: 'seleccionados', readonly: true });
+    carpeta.addButton({ title: 'Esenciales' }).on('click', () => {
+      seleccion.clear();
+      catalogo.forEach((hilo, i) => {
+        const activo = hilo.porDefecto === true;
+        estado[`h${i}`] = activo;
+        if (activo) seleccion.add(hilo.clave);
+      });
+      refrescarResumen();
+    });
+    carpeta.addButton({ title: 'Ninguno' }).on('click', () => {
+      seleccion.clear();
+      catalogo.forEach((_hilo, i) => { estado[`h${i}`] = false; });
+      refrescarResumen();
+    });
+
+    const titulos = {
+      movimiento: 'Movimiento del actor',
+      expresion: 'Expresión de la figura',
+      material: 'Materia y apariencia',
+      aparicion: 'Entrada y salida',
+    };
+    for (const categoria of ['movimiento', 'expresion', 'material', 'aparicion'] as const) {
+      const hilos = catalogo.map((hilo, i) => ({ hilo, i })).filter(({ hilo }) => hilo.categoria === categoria);
+      if (!hilos.length) continue;
+      const grupo = carpeta.addFolder({ title: titulos[categoria], expanded: false });
+      for (const { hilo, i } of hilos) {
+        const claveEstado = `h${i}`;
+        estado[claveEstado] = seleccion.has(hilo.clave);
+        grupo.addBinding(estado, claveEstado, { label: hilo.etiqueta }).on('change', (ev: { value: boolean }) => {
+          if (ev.value) seleccion.add(hilo.clave);
+          else seleccion.delete(hilo.clave);
+          refrescarResumen();
+        });
+      }
+    }
+    resumen.activos = `${seleccion.size} de ${catalogo.length}`;
+    carpeta.refresh();
   }
 
   // — Acciones propias del salón (cargar modelos, etc.) —

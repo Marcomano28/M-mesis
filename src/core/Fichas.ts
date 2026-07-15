@@ -1,16 +1,13 @@
 // Fichas — figuras guardadas: preset + miniatura, persistentes en IndexedDB.
 // Una ficha es una obra decantada: el estado exacto de un salón en un momento
-// que te gustó, lista para recargarse o (próximamente) colocarse en el Escenario.
+// que te gustó, lista para recargarse o colocarse en el Escenario.
 
-export interface Ficha {
+import type { FichaParaSalon } from './Salon';
+
+export interface Ficha extends FichaParaSalon {
   id: string;
-  nombre: string;
-  salonId: string;
-  params: Record<string, number>;
   miniatura: string; // dataURL jpeg
   fecha: number;
-  /** Carga extra del salón (p.ej. la partitura de actores de una escena). */
-  extra?: unknown;
 }
 
 export class AlmacenFichas {

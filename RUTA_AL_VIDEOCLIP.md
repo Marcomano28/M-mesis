@@ -1,7 +1,7 @@
 # MIA — Ruta al videoclip interpretado
 ### De una escena reactiva a una toma audiovisual única, reproducible y masterizable
 
-*Versión 1.1 · 15 de julio de 2026 · documento técnico de destino*
+*Versión 1.2 · 15 de julio de 2026 · documento técnico de destino*
 
 Este documento responde una pregunta concreta: **¿puede MIA producir un videoclip musical a partir de una improvisación en tiempo real?**
 
@@ -42,6 +42,7 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 | DocumentoEscena v3 | ✅ | Reparto, transforms, cámara inicial y configuración de actuación |
 | Actores estáticos/dinámicos | ✅ | Presupuesto de CPU/GPU controlable |
 | Hilos por actor | ✅ | Pose XYZ y expresiones internas direccionables |
+| Hilos seleccionados por ficha | ✅ | Cada camerino exporta solo capacidades elegidas, seguras y etiquetadas |
 | ParamBus base + modulaciones | ✅ | La actuación no destruye la composición original |
 | LFO, ratón, audio básico y MIDI | ✅ MVP | Fuentes reales o simuladas ya pueden tocar los hilos |
 | Acumuladores de frase | ✅ | Primer nivel de memoria temporal |
@@ -198,6 +199,15 @@ interface TomaPerformance {
 - Añadir cuenta atrás, inicio limpio y finalización segura.
 
 **Criterio:** después de cinco minutos, un cue de audio y uno visual mantienen una deriva imperceptible; los frames perdidos no desplazan la obra.
+
+### Contrato ya preparado para el oído musical
+
+Cada hilo de ficha conserva `categoria`, `velocidad`, `coste` y `afinidades`. La futura capa de análisis no debe volcar F0, chroma o centroide directamente sobre una enorme lista de parámetros. Primero los traducirá a un vocabulario estable —energía, ataque, altura, brillo, textura, pulso y armonía— y la Mesa podrá sugerir destinos compatibles sin decidir por el autor.
+
+- Impulso: onset/ataque → aparición, pulso o escala breve.
+- Gesto: F0, dinámica o centroide → pose y expresión corporal.
+- Frase: chroma, tonalidad y progresión → paleta, barniz, luces y cambios de estado.
+- Cámara: trayectoria dirigida por cues; la música solo modula dentro de límites lentos.
 
 ### P3 — Oído de producción
 

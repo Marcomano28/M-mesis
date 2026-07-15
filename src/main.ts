@@ -49,6 +49,10 @@ const galeria = new Galeria(
   engine,
   bus,
 );
+galeria.onCambioDestinos(() => {
+  motorSinestesia.refrescarDestinos();
+  motorLFO.refrescarDestinos();
+});
 
 // Fuentes vivas: LFOs (oscilan) y Acumuladores (recuerdan — Etapa 1 del templo)
 new PanelModuladores(motorLFO, motorAcum, () => galeria.destinosModulables());

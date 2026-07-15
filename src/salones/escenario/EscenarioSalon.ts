@@ -9,7 +9,10 @@
 
 import { Pane } from 'tweakpane';
 import * as THREE from 'three/webgpu';
-import type { Salon, Params, ParamDef, FichaParaSalon, HiloModulable } from '../../core/Salon';
+import {
+  hilosLegadoFicha,
+  type Salon, type Params, type ParamDef, type FichaParaSalon, type HiloModulable,
+} from '../../core/Salon';
 import type { ParamBus } from '../../core/ParamBus';
 import type { MotorSinestesia } from '../../core/Sinestesia';
 import type { MotorLFO } from '../../core/Moduladores';
@@ -46,14 +49,7 @@ const TRANSFORM_HILOS = [
   { clave: 'escalaZ', etiqueta: 'escala Z', min: 0.05, max: 4 },
 ] as const;
 
-// Parámetros que solo cambian uniforms o transforms. Se excluyen resolución,
-// triangulación y demás topología para que el audio no regenere geometría 60 veces/s.
-const EXPRESIONES_SEGURAS = new Set([
-  'escala', 'giro', 'puntoTam',
-  'grosor', 'angulo', 'temblor', 'grano', 'intensidad', 'luzAzimut', 'luzAltura',
-  'aplanado', 'radio', 'estela', 'ciclo', 'tono', 'opacidad',
-  'velGiro', 'sepZ', 'ampDeg',
-]);
+const TRANSFORM_CLAVES = new Set<string>(TRANSFORM_HILOS.map((hilo) => hilo.clave));
 
 export class EscenarioSalon implements Salon {
   id = 'escenario';
@@ -124,6 +120,9 @@ export class EscenarioSalon implements Salon {
     }
     try {
       const salon = fabrica(def.ficha);
+      // Una ficha anterior al selector conserva el repertorio que MIA ofrecía
+      // hasta ahora. Al volver a guardarla ya queda materializado en la ficha.
+      if (!def.ficha.hilos) def.ficha.hilos = hilosLegadoFicha(salon);
       const envoltura = new THREE.Group();
       salon.init(envoltura as unknown as THREE.Scene, this.camara);
       this.raiz.add(envoltura);
@@ -172,6 +171,7 @@ export class EscenarioSalon implements Salon {
         ...def.ficha,
         nombre: `${def.ficha.nombre} copia`,
         params: { ...def.ficha.params },
+        hilos: def.ficha.hilos?.map((hilo) => ({ ...hilo, afinidades: [...hilo.afinidades] })),
         extra: def.ficha.extra === undefined ? undefined : structuredClone(def.ficha.extra),
       },
       transform: { ...def.transform, x: def.transform.x + 0.4 },
@@ -228,27 +228,27 @@ export class EscenarioSalon implements Salon {
     const hilos: HiloModulable[] = [];
     for (const vivo of this.vivos) {
       const nombre = vivo.def.ficha.nombre;
-      for (const h of TRANSFORM_HILOS) {
+      for (const hilo of vivo.def.ficha.hilos ?? []) {
+        if (hilo.clave.startsWith('transform.')) {
+          const clave = hilo.clave.slice('transform.'.length);
+          if (!TRANSFORM_CLAVES.has(clave)) continue;
+          hilos.push({
+            etiqueta: `${nombre} · ${hilo.etiqueta}`,
+            dir: this.dirTransform(vivo.def.id, clave),
+            min: hilo.min,
+            max: hilo.max,
+          });
+          continue;
+        }
+        // Un actor estático conserva los hilos de pose, pero no evalúa su salón.
+        if (vivo.def.actividad !== 'dinamico' || !hilo.clave.startsWith('param.')) continue;
+        const clave = hilo.clave.slice('param.'.length);
+        if (vivo.def.ficha.params[clave] === undefined) continue;
         hilos.push({
-          etiqueta: `${nombre} · ${h.etiqueta}`,
-          dir: this.dirTransform(vivo.def.id, h.clave),
-          min: h.min,
-          max: h.max,
-        });
-      }
-      // Un actor estático conserva sus hilos de pose, pero no ofrece expresiones
-      // internas que el runtime no va a evaluar.
-      if (vivo.def.actividad !== 'dinamico') continue;
-      const defs = [...vivo.salon.params, ...(vivo.salon.pestanas ?? []).flatMap((p) => p.params)];
-      const unicas = new Map(defs.map((d) => [d.clave, d]));
-      for (const d of unicas.values()) {
-        if (!EXPRESIONES_SEGURAS.has(d.clave) || d.tipo === 'color' || d.opciones) continue;
-        if (vivo.def.ficha.params[d.clave] === undefined) continue;
-        hilos.push({
-          etiqueta: `${nombre} · expresión · ${d.etiqueta}`,
-          dir: this.dirParam(vivo.def.id, d.clave),
-          min: d.min,
-          max: d.max,
+          etiqueta: `${nombre} · ${hilo.etiqueta}`,
+          dir: this.dirParam(vivo.def.id, clave),
+          min: hilo.min,
+          max: hilo.max,
         });
       }
     }

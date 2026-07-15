@@ -18,7 +18,7 @@ import {
   sin, cos, mix, clamp,
 } from 'three/tsl';
 import Delaunator from 'delaunator';
-import type { Salon, Params, ParamDef } from '../../core/Salon';
+import type { Salon, Params, ParamDef, HiloFichaDef } from '../../core/Salon';
 
 const MODO = { Lineal: 0, Exponencial: 1 };
 const VISTA = { Puntos: 0, Alambre: 1, Caras: 2 };
@@ -34,6 +34,15 @@ const MAX_CARAS = 6; // la room; el plano usa 1
 export class DelaunaySalon implements Salon {
   id = 'delaunay';
   nombre = 'Delaunay';
+
+  hilosFicha: HiloFichaDef[] = [
+    { clave: 'param.giro', etiqueta: 'giro por nivel', categoria: 'movimiento', min: -2, max: 2, velocidad: 'gesto', coste: 'barato', afinidades: ['pulso'], legado: true },
+    { clave: 'param.velGiro', etiqueta: 'velocidad de giro', categoria: 'movimiento', min: 0, max: 3, velocidad: 'frase', coste: 'barato', afinidades: ['energia', 'pulso'], legado: true },
+    { clave: 'param.sepZ', etiqueta: 'separación de capas', categoria: 'expresion', min: 0, max: 0.3, velocidad: 'gesto', coste: 'barato', afinidades: ['ataque', 'altura'], porDefecto: true, legado: true },
+    { clave: 'param.escala', etiqueta: 'respiración interna', categoria: 'expresion', min: 0.2, max: 5, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], legado: true },
+    { clave: 'param.ampDeg', etiqueta: 'amplitud del degradado', categoria: 'material', min: 0, max: 1, velocidad: 'frase', coste: 'barato', afinidades: ['armonia', 'brillo'], porDefecto: true, legado: true },
+    { clave: 'param.puntoTam', etiqueta: 'tamaño de punto', categoria: 'material', min: 0.3, max: 6, velocidad: 'impulso', coste: 'barato', afinidades: ['ataque', 'brillo'], legado: true },
+  ];
 
   params: ParamDef[] = [
     { clave: 'puntos',   etiqueta: 'puntos',       valor: 40,     min: 3,   max: 400, paso: 1 },

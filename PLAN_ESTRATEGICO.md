@@ -47,6 +47,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 | **Fichas** (cajonera) | ✅ | Captura de miniatura sincronizada con el frame WebGPU; IndexedDB; cargar/borrar; los paneles respetan valores cargados |
 | **El Escenario v3** | ✅ | Actores con ID estable, transform XYZ, visibilidad, duplicación, actividad y actuación persistente |
 | **Hilos individuales** | ✅ | Pose y expresiones seguras direccionadas como `actor:<id>...`; ratón, LFO, memoria y audio pueden actuar por personaje |
+| **Hilos por ficha** | ✅ | Cada salón declara catálogo seguro; el autor exporta solo los elegidos y la cajonera muestra su cantidad |
 | **Escenas como fichas** | ✅ | ☆ guarda DocumentoEscena, actores y assets GLB de Trazo; clic en la card restaura la puesta |
 | **Export HTML del Escenario** | 🟡 | Reproduce Formas Exóticas y Trazo/GLB con transforms. Delaunay, Relieve, rutas, cámara de obra y runtime musical aún no están unificados |
 | **Moduladores (LFOs)** | ✅ | Base + Σ desplazamientos con clamp; cinco ondas y destinos de salón/actor |
@@ -88,6 +89,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 - **Fábricas**: registro `salonId → constructor`. Permite al Escenario crear instancias frescas de cualquier salón (uniforms y materiales propios por actor) sin conocerlos. Un salón nuevo queda disponible como actor con una línea en `main.ts`.
 - **`recibirFicha()`**: hook opcional del contrato Salon — cualquier salón puede aceptar fichas (hoy solo el Escenario lo implementa).
 - **Actor**: ficha + ID estable + transform XYZ + actividad. Sus hilos usan direcciones `actor:<id>.transform.*` y `actor:<id>.param.*`; las rutas musicales modulan sin destruir la base.
+- **Hilo de ficha**: capacidad local segura (`transform.rotY`, `param.temblor`, etc.) con categoría, coste, escala temporal y afinidades musicales. El ID global solo se asigna al convertir la ficha en actor.
 - **Modos de exposición**: Puntos / Alambre / Caras como atributo estándar (hoy en Formas Exóticas; generalizable vía el tipo `opciones` del ParamDef).
 
 **Lecciones de runtime que ya son reglas del proyecto:**
@@ -146,7 +148,7 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - *Criterio:* rasgos visibles en vivo; onset→pulso visual sintiéndose instantáneo.
 
 **Etapa 5 — La Matriz de Mapeo** *(el oído aprende a traducir)*
-- Mesa v1 operativa ✅: fuente, destino individual/global, curva, rango, suavizado asimétrico y persistencia dentro de la escena. Falta matriz 1:N/N:1, grupos y fichas de sinestesia independientes ancladas en la matemática compartida.
+- Mesa v1 operativa ✅: fuente, destino individual/global, curva, rango, suavizado asimétrico, persistencia y destinos filtrados por ficha. Cada hilo ya lleva afinidades con energía/ataque/altura/brillo/textura/pulso/armonía. Falta matriz 1:N/N:1, grupos, sugerencias semánticas y fichas de sinestesia independientes.
 - *Criterio:* cambiar de ficha de sinestesia en vivo transforma el carácter del viaje sin tocar código.
 
 **Etapa 6 — Los Gestos** *(el vocabulario del músico)*

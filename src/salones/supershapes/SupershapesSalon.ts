@@ -19,7 +19,7 @@ import {
   Fn, uniform, float, vec3, vec4, uv, mix, abs, sin, cos, exp, max,
   clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute, mx_noise_float, fract,
 } from 'three/tsl';
-import type { Salon, Params, ParamDef, Pestana } from '../../core/Salon';
+import type { Salon, Params, ParamDef, Pestana, HiloFichaDef } from '../../core/Salon';
 
 const PI = Math.PI;
 const VISTA = { Puntos: 0, Alambre: 1, Caras: 2 };
@@ -28,6 +28,12 @@ const CARACOL = { Peludo: 0, Picos: 1, Moro: 2 };
 export class SupershapesSalon implements Salon {
   id = 'supershapes';
   nombre = 'Formas Exóticas';
+
+  hilosFicha: HiloFichaDef[] = [
+    { clave: 'param.escala', etiqueta: 'respiración interna', categoria: 'expresion', min: 0.2, max: 5, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], porDefecto: true, legado: true },
+    { clave: 'param.giro', etiqueta: 'giro propio', categoria: 'movimiento', min: -2, max: 2, velocidad: 'gesto', coste: 'barato', afinidades: ['pulso'], legado: true },
+    { clave: 'param.puntoTam', etiqueta: 'tamaño de punto', categoria: 'material', min: 0.001, max: 0.1, velocidad: 'impulso', coste: 'barato', afinidades: ['ataque', 'brillo'], legado: true },
+  ];
 
   params: ParamDef[] = [
     { clave: 'escala',     etiqueta: 'escala',     valor: 2,    min: 0.2, max: 5 },

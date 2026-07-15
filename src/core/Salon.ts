@@ -28,6 +28,66 @@ export interface HiloModulable {
   max: number;
 }
 
+export type CategoriaHiloFicha = 'movimiento' | 'expresion' | 'material' | 'aparicion';
+export type EscalaTemporalHilo = 'impulso' | 'gesto' | 'frase';
+export type CosteHilo = 'barato' | 'medio' | 'caro';
+export type AfinidadMusical =
+  | 'energia' | 'ataque' | 'altura' | 'brillo' | 'textura' | 'pulso' | 'armonia';
+
+/** Capacidad expresiva local que viaja con una ficha, aún sin ID de actor. */
+export interface HiloFicha {
+  /** `transform.rotY` o `param.temblor`; se resuelve al importar al Escenario. */
+  clave: string;
+  etiqueta: string;
+  categoria: CategoriaHiloFicha;
+  min: number;
+  max: number;
+  velocidad: EscalaTemporalHilo;
+  coste: CosteHilo;
+  afinidades: AfinidadMusical[];
+}
+
+/** Entrada del catálogo del salón; los flags solo gobiernan selección/migración. */
+export interface HiloFichaDef extends HiloFicha {
+  porDefecto?: boolean;
+  legado?: boolean;
+}
+
+/** Movimiento universal disponible para cualquier personaje. */
+export const HILOS_TRANSFORM_ACTOR: HiloFichaDef[] = [
+  { clave: 'transform.x', etiqueta: 'posición X', categoria: 'movimiento', min: -8, max: 8, velocidad: 'gesto', coste: 'barato', afinidades: ['altura'] },
+  { clave: 'transform.y', etiqueta: 'posición Y', categoria: 'movimiento', min: -8, max: 8, velocidad: 'gesto', coste: 'barato', afinidades: ['altura'], porDefecto: true },
+  { clave: 'transform.z', etiqueta: 'posición Z', categoria: 'movimiento', min: -8, max: 8, velocidad: 'frase', coste: 'barato', afinidades: ['energia'] },
+  { clave: 'transform.rotX', etiqueta: 'rotación X', categoria: 'movimiento', min: -Math.PI, max: Math.PI, velocidad: 'gesto', coste: 'barato', afinidades: ['textura'] },
+  { clave: 'transform.rotY', etiqueta: 'rotación Y', categoria: 'movimiento', min: -Math.PI, max: Math.PI, velocidad: 'gesto', coste: 'barato', afinidades: ['pulso'], porDefecto: true },
+  { clave: 'transform.rotZ', etiqueta: 'rotación Z', categoria: 'movimiento', min: -Math.PI, max: Math.PI, velocidad: 'gesto', coste: 'barato', afinidades: ['altura'] },
+  { clave: 'transform.escalaX', etiqueta: 'escala X', categoria: 'movimiento', min: 0.05, max: 4, velocidad: 'impulso', coste: 'barato', afinidades: ['ataque'] },
+  { clave: 'transform.escalaY', etiqueta: 'escala Y', categoria: 'movimiento', min: 0.05, max: 4, velocidad: 'impulso', coste: 'barato', afinidades: ['ataque', 'energia'], porDefecto: true },
+  { clave: 'transform.escalaZ', etiqueta: 'escala Z', categoria: 'movimiento', min: 0.05, max: 4, velocidad: 'impulso', coste: 'barato', afinidades: ['ataque'] },
+];
+
+export function catalogoHilosFicha(salon: Salon): HiloFichaDef[] {
+  if (!salon.hilosFicha) return [];
+  return [...HILOS_TRANSFORM_ACTOR, ...salon.hilosFicha].map((hilo) => ({ ...hilo, afinidades: [...hilo.afinidades] }));
+}
+
+export function hilosInicialesFicha(salon: Salon): HiloFicha[] {
+  return materializarHilos(catalogoHilosFicha(salon).filter((hilo) => hilo.porDefecto));
+}
+
+/** Compatibilidad: las fichas anteriores conservan todos los transforms y expresiones que ya ofrecían. */
+export function hilosLegadoFicha(salon: Salon): HiloFicha[] {
+  return materializarHilos(catalogoHilosFicha(salon).filter((hilo) =>
+    hilo.clave.startsWith('transform.') || hilo.legado));
+}
+
+export function materializarHilos(hilos: HiloFichaDef[]): HiloFicha[] {
+  return hilos.map(({ porDefecto: _porDefecto, legado: _legado, ...hilo }) => ({
+    ...hilo,
+    afinidades: [...hilo.afinidades],
+  }));
+}
+
 /** Acción no-numérica del salón (p.ej. «Cargar modelo GLB»). Se vuelve botón en el panel. */
 export interface Accion {
   titulo: string;
@@ -39,6 +99,8 @@ export interface FichaParaSalon {
   salonId: string;
   nombre: string;
   params: Record<string, number>;
+  /** Solo estos hilos aparecerán como destinos cuando la ficha sea actor. */
+  hilos?: HiloFicha[];
   /** Datos no numéricos de la ficha (por ejemplo, el archivo GLB importado). */
   extra?: unknown;
 }
@@ -57,6 +119,8 @@ export interface Salon {
   /** Modos del salón. La pestaña activa llega al bus como `<id>.modo` (índice). */
   pestanas?: Pestana[];
   acciones?: Accion[];
+  /** Capacidades internas seguras que el autor puede exportar con la ficha. */
+  hilosFicha?: HiloFichaDef[];
 
   /** Monta el efecto en la escena. Se llama una vez al entrar al salón. */
   init(escena: THREE.Scene, camara: THREE.PerspectiveCamera): void;

@@ -19,7 +19,7 @@ import {
   sin, cos, clamp, smoothstep, screenCoordinate, normalWorld, mx_noise_float,
 } from 'three/tsl';
 import { crearLoaderGLB, elegirYCargarGLB } from '../../core/CargadorGLB';
-import type { Salon, Params, ParamDef, Accion } from '../../core/Salon';
+import type { Salon, Params, ParamDef, Accion, HiloFichaDef } from '../../core/Salon';
 
 interface ModeloGuardado {
   tipo: 'mia-glb';
@@ -38,6 +38,18 @@ function modeloDesdeExtra(extra: unknown): ModeloGuardado | null {
 export class CrossHatchSalon implements Salon {
   id = 'crosshatch';
   nombre = 'Trazo y Grafito';
+
+  hilosFicha: HiloFichaDef[] = [
+    { clave: 'param.escala', etiqueta: 'escala de trama', categoria: 'material', min: 0.02, max: 0.4, velocidad: 'gesto', coste: 'barato', afinidades: ['textura', 'brillo'], legado: true },
+    { clave: 'param.grosor', etiqueta: 'grosor de línea', categoria: 'material', min: 0.1, max: 0.95, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], legado: true },
+    { clave: 'param.angulo', etiqueta: 'ángulo de trama', categoria: 'material', min: 0, max: 180, velocidad: 'frase', coste: 'barato', afinidades: ['armonia'], legado: true },
+    { clave: 'param.temblor', etiqueta: 'temblor del trazo', categoria: 'expresion', min: 0, max: 1.5, velocidad: 'gesto', coste: 'barato', afinidades: ['textura', 'ataque'], porDefecto: true, legado: true },
+    { clave: 'param.grano', etiqueta: 'grano del papel', categoria: 'material', min: 0, max: 1, velocidad: 'frase', coste: 'barato', afinidades: ['textura'], legado: true },
+    { clave: 'param.intensidad', etiqueta: 'intensidad de tinta', categoria: 'material', min: 0, max: 2, velocidad: 'gesto', coste: 'barato', afinidades: ['energia', 'brillo'], porDefecto: true, legado: true },
+    { clave: 'param.luzAzimut', etiqueta: 'azimut de luz', categoria: 'expresion', min: 0, max: 360, velocidad: 'frase', coste: 'barato', afinidades: ['armonia'], legado: true },
+    { clave: 'param.luzAltura', etiqueta: 'altura de luz', categoria: 'expresion', min: -80, max: 80, velocidad: 'frase', coste: 'barato', afinidades: ['altura', 'brillo'], legado: true },
+    { clave: 'param.giro', etiqueta: 'giro propio', categoria: 'movimiento', min: -2, max: 2, velocidad: 'gesto', coste: 'barato', afinidades: ['pulso'], legado: true },
+  ];
 
   params: ParamDef[] = [
     { clave: 'escala',     etiqueta: 'escala trama',  valor: 0.12, min: 0.02, max: 0.4 },
