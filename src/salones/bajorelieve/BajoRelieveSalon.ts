@@ -18,6 +18,21 @@ import type { Salon, Params, ParamDef, Pestana, Accion, HiloFichaDef } from '../
 
 const MODELO_DEFECTO = '/relieve.glb'; // vive en public/
 
+/** El binario viaja en la ficha, igual que en Trazo y Grafito. */
+interface ModeloGuardado {
+  tipo: 'mia-glb';
+  version: 1;
+  nombre: string;
+  datos: ArrayBuffer;
+}
+
+function modeloDesdeExtra(extra: unknown): ModeloGuardado | null {
+  if (!extra || typeof extra !== 'object') return null;
+  const modelo = extra as Partial<ModeloGuardado>;
+  return modelo.tipo === 'mia-glb' && modelo.version === 1 && typeof modelo.nombre === 'string' &&
+    modelo.datos instanceof ArrayBuffer ? modelo as ModeloGuardado : null;
+}
+
 export class BajoRelieveSalon implements Salon {
   id = 'bajorelieve';
   nombre = 'Bajo Relieve';
@@ -74,6 +89,13 @@ export class BajoRelieveSalon implements Salon {
   private modoActual = -1;
   private fondoPrevio: THREE.Color | THREE.Texture | null = null;
   private quitarEventos: (() => void) | null = null;
+  private modeloGuardado: ModeloGuardado | null;
+  /** Impide que una carga antigua (p.ej. el GLB por defecto) pise una nueva. */
+  private generacionModelo = 0;
+
+  constructor(extra?: unknown) {
+    this.modeloGuardado = modeloDesdeExtra(extra);
+  }
 
   init(escena: THREE.Scene): void {
     this.estela = new Estela(innerWidth, innerHeight);
@@ -93,7 +115,8 @@ export class BajoRelieveSalon implements Salon {
       removeEventListener('resize', alRedimensionar);
     };
 
-    this.cargarModelo(MODELO_DEFECTO);
+    if (this.modeloGuardado) void this.restaurarModeloGuardado();
+    else this.cargarModelo(MODELO_DEFECTO);
   }
 
   update(dt: number, _t: number, p: Params): void {
@@ -120,6 +143,7 @@ export class BajoRelieveSalon implements Salon {
   }
 
   dispose(escena: THREE.Scene): void {
+    this.generacionModelo++;
     this.quitarEventos?.();
     escena.remove(this.grupo);
     for (const m of this.mallas) {
@@ -203,12 +227,43 @@ export class BajoRelieveSalon implements Salon {
   // ————— Carga de modelos —————
 
   private cargarModelo(url: string): void {
-    crearLoaderGLB().load(url, (gltf) => this.montarModelo(gltf.scene), undefined,
+    const generacion = ++this.generacionModelo;
+    crearLoaderGLB().load(url, (gltf) => {
+      if (generacion === this.generacionModelo) this.montarModelo(gltf.scene);
+    }, undefined,
       (err) => console.error('Error cargando GLB:', err));
   }
 
   private cargarGLB(): void {
-    elegirYCargarGLB(({ escena }) => this.montarModelo(escena));
+    elegirYCargarGLB(({ escena, nombre, datos }) => {
+      this.modeloGuardado = { tipo: 'mia-glb', version: 1, nombre, datos: datos.slice(0) };
+      this.generacionModelo++;
+      this.montarModelo(escena);
+    });
+  }
+
+  estadoExtra(): unknown {
+    if (!this.modeloGuardado) return undefined;
+    return { ...this.modeloGuardado, datos: this.modeloGuardado.datos.slice(0) };
+  }
+
+  cargarEstadoExtra(extra: unknown): void {
+    this.modeloGuardado = modeloDesdeExtra(extra);
+    if (this.modeloGuardado && this.texturaEstela) void this.restaurarModeloGuardado();
+  }
+
+  private async restaurarModeloGuardado(): Promise<void> {
+    const modelo = this.modeloGuardado;
+    if (!modelo) return;
+    const generacion = ++this.generacionModelo;
+    try {
+      const gltf = await crearLoaderGLB().parseAsync(modelo.datos.slice(0), '');
+      if (generacion === this.generacionModelo && this.modeloGuardado === modelo) {
+        this.montarModelo(gltf.scene);
+      }
+    } catch (err) {
+      console.error(`No se pudo restaurar el GLB «${modelo.nombre}»:`, err);
+    }
   }
 
   private montarModelo(modelo: THREE.Object3D): void {

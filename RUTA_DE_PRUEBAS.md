@@ -46,6 +46,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P14 | ✅ | Persistencia de la coreografía | Una ficha restauró actor, ruta `audio ataque → rotación Y`, LFO `→ rotación X` y acumulador `rotación X → escala Z`; quitar el actor limpió los tres motores |
 | P15 | ✅ | Hilos seleccionados por ficha | Una ficha `🧵 1` ofreció en la Mesa únicamente `Actor un hilo · rotación Y`; la escena guardada conservó actor, selección y ruta |
 | P16 | ✅ | Transporte musical compartido | `preparado → reproduciendo → preparado`, avance 00:00→00:01.5 y compás 1·4 a 120 BPM; stop volvió a cero. Una escena restauró 90 BPM, 3 pulsos, 12 s y bucle apagado después de alterarlos |
+| P17 | 🟡 | GLB de Bajo Relieve → ficha → Escenario | El mismo GLB importado debe montar como actor, no volver a `/relieve.glb`; queda pendiente de comprobar con un archivo del usuario |
 
 **Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
@@ -133,6 +134,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E14 | Seleccionar un único hilo, guardar ficha y añadirla al Escenario | La cajonera muestra `🧵 1`; la Mesa ofrece solo ese destino para el actor |
 | E15 | Guardar y restaurar una escena con la ficha filtrada | La selección de hilos y las rutas sobreviven dentro de DocumentoEscena v3 |
 | E16 | Preparar/reproducir/detener y restaurar una escena con otro tempo | El reloj avanza por tiempo musical, vuelve a cero y recupera BPM, métrica, duración y bucle |
+| E17 | Importar GLB en Bajo Relieve, guardarlo y añadirlo al Escenario | El actor conserva el binario de la ficha; una carga tardía del modelo por defecto no puede reemplazarlo |
 
 ## Cierre
 

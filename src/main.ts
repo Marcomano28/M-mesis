@@ -31,7 +31,7 @@ const fabricas = {
   // ficha, no los cuatro camerinos completos.
   supershapes: (ficha: { params: Record<string, number> }) => new SupershapesSalon(ficha.params.modo),
   crosshatch: (ficha: { extra?: unknown }) => new CrossHatchSalon(ficha.extra),
-  bajorelieve: () => new BajoRelieveSalon(),
+  bajorelieve: (ficha: { extra?: unknown }) => new BajoRelieveSalon(ficha.extra),
   delaunay: () => new DelaunaySalon(),
 };
 

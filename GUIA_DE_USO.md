@@ -40,7 +40,7 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
 3. En Formas Exóticas, los controles comunes aplican a ambas variantes: **resolución** (densidad de la retícula), **exposición** (Puntos / Alambre / Caras) y **color**.
 4. Salones con modelos: **📦 Cargar modelo GLB…** abre el selector de archivos — vale cualquier .glb/.gltf de cualquier carpeta, comprimido con Draco o no. En **Trazo y Grafito**, el GLB importado queda dentro de la ficha: al guardarla, recargarla o mandarla al Escenario reaparece el mismo modelo, no el nudo de muestra.
    - Trazo y Grafito comienza sin giro. Sus controles **fondo**, **líneas** y **polaridad** permiten invertir el papel y el grafito de un gesto.
-   - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. El salón auto-orienta el relieve (su eje delgado mira a cámara).
+   - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. El salón auto-orienta el relieve (su eje delgado mira a cámara). Su GLB importado viaja dentro de la ficha y reaparece como el mismo actor al añadirlo al Escenario.
 5. Abre **🧵 Hilos de la ficha** antes de guardar:
    - **Esenciales** recupera una selección corta recomendada por el salón.
    - **Ninguno** permite empezar de cero.
