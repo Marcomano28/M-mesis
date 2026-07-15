@@ -5,6 +5,9 @@
 // más adelante, reproducir la misma partitura dentro del editor y del export.
 
 import type { FichaParaSalon } from './Salon';
+import type { RutaSinestesiaGuardada } from './Sinestesia';
+import type { LFO } from './Moduladores';
+import type { AcumuladorGuardado } from './Acumuladores';
 
 export type ActividadActor = 'estatico' | 'dinamico';
 
@@ -42,14 +45,25 @@ export interface PistaEscena {
   claves: { tiempo: number; valor: number }[];
 }
 
+export interface ActuacionEscena {
+  rutas: RutaSinestesiaGuardada[];
+  lfos: LFO[];
+  acumuladores: AcumuladorGuardado[];
+}
+
 export interface DocumentoEscena {
-  version: 2;
+  version: 3;
   duracion: number;
   bucle: boolean;
   actores: ActorEscena[];
   camara: CamaraEscena;
   luces: unknown[];
   pistas: PistaEscena[];
+  actuacion: ActuacionEscena;
+}
+
+interface DocumentoV2 extends Omit<DocumentoEscena, 'version' | 'actuacion'> {
+  version: 2;
 }
 
 interface ActorV1 {
@@ -91,27 +105,29 @@ function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
 
 export function crearDocumentoEscena(): DocumentoEscena {
   return {
-    version: 2,
+    version: 3,
     duracion: 60,
     bucle: true,
     actores: [],
     camara: { posicion: [0, 0, 6], objetivo: [0, 0, 0], fov: 50 },
     luces: [],
     pistas: [],
+    actuacion: { rutas: [], lfos: [], acumuladores: [] },
   };
 }
 
-/** Acepta el MVP anterior y devuelve siempre un documento v2 independiente. */
+/** Acepta los MVP v1/v2 y devuelve siempre un documento v3 independiente. */
 export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
   if (!extra || typeof extra !== 'object') return null;
-  const datos = extra as DocumentoEscena | DocumentoV1;
+  const datos = extra as DocumentoEscena | DocumentoV2 | DocumentoV1;
   if (!Array.isArray(datos.actores)) return null;
 
-  if (datos.version === 2) {
-    const d = datos as DocumentoEscena;
+  if (datos.version === 3 || datos.version === 2) {
+    const d = datos as DocumentoEscena | DocumentoV2;
     return {
       ...crearDocumentoEscena(),
       ...d,
+      version: 3,
       camara: { ...crearDocumentoEscena().camara, ...d.camara },
       actores: d.actores.map((a) => ({
         ...a,
@@ -123,6 +139,7 @@ export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
       })),
       luces: [...(d.luces ?? [])],
       pistas: [...(d.pistas ?? [])],
+      actuacion: d.version === 3 ? copiarActuacion(d.actuacion) : { rutas: [], lfos: [], acumuladores: [] },
     };
   }
 
@@ -142,4 +159,12 @@ export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
     };
   });
   return documento;
+}
+
+function copiarActuacion(actuacion: ActuacionEscena | undefined): ActuacionEscena {
+  return {
+    rutas: (actuacion?.rutas ?? []).map((ruta) => ({ ...ruta })),
+    lfos: (actuacion?.lfos ?? []).map((lfo) => ({ ...lfo })),
+    acumuladores: (actuacion?.acumuladores ?? []).map((a) => ({ ...a })),
+  };
 }

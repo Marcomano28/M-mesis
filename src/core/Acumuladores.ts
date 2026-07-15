@@ -26,6 +26,8 @@ export interface Acumulador {
   valor: number;               // salida 0..1 (para monitores)
 }
 
+export type AcumuladorGuardado = Omit<Acumulador, 'valor'>;
+
 interface Estado {
   anterior: number | null;     // última muestra de la fuente (para derivada)
   maxDeriv: number;            // auto-calibración: máximo reciente de la derivada
@@ -41,6 +43,7 @@ export class MotorAcumuladores {
   private estados = new Map<string, Estado>();
   private actividadFrame = 0;
   private secuencia = 1;
+  private escuchasCambio = new Set<() => void>();
 
   constructor(private bus: ParamBus) {}
 
@@ -64,6 +67,7 @@ export class MotorAcumuladores {
     this.estados.set(a.id, {
       anterior: null, maxDeriv: 1e-6, ultimaActividad: 0, interno: 0, destinoPrevio: destino,
     });
+    this.emitirCambio();
     return a;
   }
 
@@ -71,6 +75,46 @@ export class MotorAcumuladores {
     this.acumuladores = this.acumuladores.filter((a) => a.id !== id);
     this.estados.delete(id);
     this.bus.limpiarFuente(id);
+    this.emitirCambio();
+  }
+
+  onCambio(fn: () => void): () => void {
+    this.escuchasCambio.add(fn);
+    return () => this.escuchasCambio.delete(fn);
+  }
+
+  exportar(filtro: (acumulador: Acumulador) => boolean = () => true): AcumuladorGuardado[] {
+    return this.acumuladores.filter(filtro).map(({ valor: _valor, ...acumulador }) => ({ ...acumulador }));
+  }
+
+  restaurar(acumuladores: AcumuladorGuardado[]): void {
+    for (const actual of this.acumuladores) this.bus.limpiarFuente(actual.id);
+    this.acumuladores = acumuladores.map((a) => ({ ...a, valor: 0 }));
+    this.estados.clear();
+    for (const a of this.acumuladores) this.estados.set(a.id, this.estadoInicial(a.destino));
+    this.secuencia = siguienteSecuencia('acum-', this.acumuladores.map((a) => a.id));
+    this.actividadFrame = 0;
+    this.emitirCambio();
+  }
+
+  eliminarDonde(predicado: (acumulador: Acumulador) => boolean): void {
+    const borrar = this.acumuladores.filter(predicado);
+    if (!borrar.length) return;
+    for (const a of borrar) {
+      this.bus.limpiarFuente(a.id);
+      this.estados.delete(a.id);
+    }
+    const ids = new Set(borrar.map((a) => a.id));
+    this.acumuladores = this.acumuladores.filter((a) => !ids.has(a.id));
+    this.emitirCambio();
+  }
+
+  private estadoInicial(destino: string): Estado {
+    return { anterior: null, maxDeriv: 1e-6, ultimaActividad: 0, interno: 0, destinoPrevio: destino };
+  }
+
+  private emitirCambio(): void {
+    for (const fn of this.escuchasCambio) fn();
   }
 
   /** Un tick por frame. `tiempo` en segundos (reloj del motor). */
@@ -131,4 +175,8 @@ export class MotorAcumuladores {
 
     this.actividadFrame = 0;
   }
+}
+
+function siguienteSecuencia(prefijo: string, ids: string[]): number {
+  return Math.max(0, ...ids.map((id) => id.startsWith(prefijo) ? Number(id.slice(prefijo.length)) || 0 : 0)) + 1;
 }

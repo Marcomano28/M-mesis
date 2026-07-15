@@ -27,6 +27,7 @@ const CURVAS: Record<string, CurvaSinestesia> = {
 
 export class PanelSinestesia {
   private pane: Pane;
+  private carpetas: { dispose(): void }[] = [];
 
   constructor(
     private motor: MotorSinestesia,
@@ -56,37 +57,54 @@ export class PanelSinestesia {
         .finally(() => this.pane.refresh());
     });
     this.pane.addButton({ title: '➕ Añadir ruta (al salón activo)' }).on('click', () => this.agregar());
+    this.motor.onCambio(() => this.reconstruirRutas());
+    this.reconstruirRutas();
   }
 
   private agregar(): void {
     const destinos = this.destinos();
     if (!destinos.length) return;
     const primero = destinos[0];
-    const ruta = this.motor.crear(primero.dir, primero.min, primero.max);
+    this.motor.crear(primero.dir, primero.min, primero.max);
+  }
 
-    const folder = this.pane.addFolder({ title: `Ruta — ${ruta.id}` });
-    folder.addBinding(ruta, 'activo', { label: 'activo' });
-    folder.addBinding(ruta, 'fuente', { label: 'fuente', options: FUENTES });
-    folder.addBinding(ruta, 'destino', {
-      label: 'destino',
-      options: Object.fromEntries(destinos.map((d) => [d.etiqueta, d.dir])),
-    }).on('change', (ev: { value: string }) => {
-      const destino = destinos.find((d) => d.dir === ev.value);
-      if (!destino) return;
-      ruta.min = destino.min;
-      ruta.max = destino.max;
-      folder.refresh();
-    });
-    folder.addBinding(ruta, 'curva', { label: 'curva', options: CURVAS });
-    folder.addBinding(ruta, 'min', { label: 'mín', min: -5000, max: 5000, step: paso(primero) });
-    folder.addBinding(ruta, 'max', { label: 'máx', min: -5000, max: 5000, step: paso(primero) });
-    folder.addBinding(ruta, 'ataque', { label: 'ataque', min: 0, max: 1, step: 0.01 });
-    folder.addBinding(ruta, 'caida', { label: 'caída', min: 0, max: 3, step: 0.01 });
-    folder.addBinding(ruta, 'valor', { label: 'valor', min: 0, max: 1, step: 0.001, readonly: true });
-    folder.addButton({ title: '✕ Quitar' }).on('click', () => {
-      this.motor.quitar(ruta.id);
-      folder.dispose();
-    });
+  private reconstruirRutas(): void {
+    for (const carpeta of this.carpetas) carpeta.dispose();
+    this.carpetas = [];
+    for (const ruta of this.motor.rutas) {
+      const disponibles = this.destinos();
+      if (!disponibles.some((d) => d.dir === ruta.destino)) {
+        disponibles.push({
+          etiqueta: `destino guardado · ${ruta.destino}`,
+          dir: ruta.destino,
+          min: ruta.min,
+          max: ruta.max,
+        });
+      }
+      const actual = disponibles.find((d) => d.dir === ruta.destino) ?? disponibles[0];
+
+      const folder = this.pane.addFolder({ title: `Ruta — ${ruta.id}` });
+      this.carpetas.push(folder);
+      folder.addBinding(ruta, 'activo', { label: 'activo' });
+      folder.addBinding(ruta, 'fuente', { label: 'fuente', options: FUENTES });
+      folder.addBinding(ruta, 'destino', {
+        label: 'destino',
+        options: Object.fromEntries(disponibles.map((d) => [d.etiqueta, d.dir])),
+      }).on('change', (ev: { value: string }) => {
+        const destino = disponibles.find((d) => d.dir === ev.value);
+        if (!destino) return;
+        ruta.min = destino.min;
+        ruta.max = destino.max;
+        folder.refresh();
+      });
+      folder.addBinding(ruta, 'curva', { label: 'curva', options: CURVAS });
+      folder.addBinding(ruta, 'min', { label: 'mín', min: -5000, max: 5000, step: paso(actual) });
+      folder.addBinding(ruta, 'max', { label: 'máx', min: -5000, max: 5000, step: paso(actual) });
+      folder.addBinding(ruta, 'ataque', { label: 'ataque', min: 0, max: 1, step: 0.01 });
+      folder.addBinding(ruta, 'caida', { label: 'caída', min: 0, max: 3, step: 0.01 });
+      folder.addBinding(ruta, 'valor', { label: 'valor', min: 0, max: 1, step: 0.001, readonly: true });
+      folder.addButton({ title: '✕ Quitar' }).on('click', () => this.motor.quitar(ruta.id));
+    }
   }
 }
 

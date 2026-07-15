@@ -3,7 +3,7 @@
 
 *Documento vivo · actualizado el 15 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md y RUTA_AL_VIDEOCLIP.md*
 
-**Estado actual:** camerinos, fichas y **Escenario v2** utilizables. Los actores ya tienen identidad, visibilidad, transform completo, duplicación, modo estático/dinámico y **hilos individuales** para las fuentes vivas. La cámara de obra, luces escénicas, vestuario por actor y timeline musical todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
+**Estado actual:** camerinos, fichas y **Escenario v3** utilizables. Los actores ya tienen identidad, visibilidad, transform completo, duplicación, modo estático/dinámico y **hilos individuales persistentes**. Una ficha de escena conserva también rutas de sinestesia, LFOs y acumuladores. La cámara de obra, luces escénicas, vestuario por actor y timeline musical todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
 
 ---
 
@@ -65,7 +65,8 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria` y `motorLFO
    - **dinámico** mantiene vivo el `update()` del camerino: úsalo si gira, respira, reacciona o evoluciona.
 3. **giro global** (panel derecho) rota la escena entera; si una ficha lleva `giro` propio, ese actor se anima solo.
 4. La composición **persiste** aunque salgas del Escenario y vuelvas. Al restaurar una escena, los actores entran progresivamente —uno por frame— para evitar un bloqueo largo.
-5. **☆ Guardar ficha** estando en el Escenario = guarda **la escena completa** (actores + transforms + miniatura). Clic en esa card después = la escena vuelve entera (reemplaza la composición actual).
+5. **☆ Guardar ficha** estando en el Escenario = guarda **la escena completa**: actores, transforms, miniatura y su actuación (rutas, LFOs y acumuladores). Clic en esa card después = la escena vuelve entera y reemplaza la composición actual.
+6. Al quitar un actor se eliminan también las rutas, LFOs y acumuladores que lo usan como fuente o destino; así no quedan hilos apuntando a una marioneta inexistente.
 
 **Ruta corta:** `🗂 → ➕➕➕ → acomodar en 🎭 → ☆ para congelar la escena`
 
@@ -73,7 +74,7 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria` y `motorLFO
 
 ## 5. Animar (los moduladores)
 
-> **Alcance actual:** estando en el Escenario, las fuentes vivas pueden actuar sobre la escena completa o sobre los hilos de cada actor. Cámara, luces y reproducción de una partitura temporal siguen pendientes.
+> **Alcance actual:** estando en el Escenario, las fuentes vivas pueden actuar sobre la escena completa o sobre los hilos de cada actor, y esa configuración viaja con la ficha de escena. Cámara, luces y reproducción de una partitura temporal siguen pendientes.
 
 1. Activa el salón (o el Escenario) cuyo parámetro quieras mover.
 2. **〰 Moduladores → ➕ Añadir LFO**: el desplegable *destino* ofrece los sliders del salón activo en ese momento.
@@ -94,7 +95,7 @@ Reglas de la casa:
 - Varios LFOs pueden apilarse sobre el mismo parámetro.
 - El resultado nunca se sale de los límites del slider (clamp automático).
 - Las fichas y el Imprimir guardan siempre la **base limpia**, no la oscilación.
-- *(Los LFOs viven en la sesión: aún no se guardan en fichas.)*
+- Guardar una **ficha de Escenario** conserva LFOs, acumuladores y rutas sin guardar su valor instantáneo. Al volver, cada motor comienza desde un estado limpio y aplica la misma configuración.
 
 **Ruta corta:** `salón activo → 〰 → ➕ → destino/forma/frecuencia/amplitud`
 
@@ -112,8 +113,8 @@ Reglas de la casa:
 
 ```
    MODELAR            COLECCIONAR           COMPONER              ANIMAR              IMPRIMIR
-  salón + sliders  →  ☆ ficha en 🗂     →  ➕ actores en 🎭   →  〰 LFOs encima   →  ⎙ HTML autónomo
-                       (persiste)            (persiste)            (en vivo)            (para el mundo)
+  salón + sliders  →  ☆ ficha en 🗂     →  ➕ actores en 🎭   →  hilos y memoria →  ⎙ HTML autónomo
+                       (persiste)            (persiste)            (persisten)           (para el mundo)
 ```
 
 Y la promesa del Acto II: donde hoy dice 〰 LFO, mañana dirá 🎸 guitarra — misma arquitectura, otra fuente escribiendo en el bus.
@@ -127,8 +128,8 @@ Y la promesa del Acto II: donde hoy dice 〰 LFO, mañana dirá 🎸 guitarra �
 - **GLB "invisible" en Bajo Relieve**: sube el slider *aplanado base* para ver el modelo completo sin estela.
 - **La miniatura no refleja lo que ves**: la captura toma el frame actual — encuadra antes de ☆.
 - **Reset rápido de fichas**: borra la base de datos `mia-fichas` en DevTools → Application → IndexedDB.
-- **Rutas de sinestesia**: los hilos individuales funcionan en vivo, pero las rutas todavía no se guardan dentro de la ficha de Escenario ni se exportan al HTML.
-- **Cámara actual**: OrbitControls sigue siendo cámara de inspección. Su posición y FOV se guardan en el DocumentoEscena v2, pero todavía no existe una cámara de obra independiente ni pistas de cámara.
+- **Export de la actuación**: las rutas, LFOs y acumuladores se guardan en DocumentoEscena v3 y se restauran dentro de MIA, pero todavía no se ejecutan en el HTML exportado.
+- **Cámara actual**: OrbitControls sigue siendo cámara de inspección. Su posición y FOV se guardan en el DocumentoEscena v3, pero todavía no existe una cámara de obra independiente ni pistas de cámara.
 - **Luces, vestuario y timeline**: aparecen ya reservados en el documento de escena, pero todavía no tienen herramientas de edición. No deben incluirse como fallos en la ronda actual.
 
 ---
@@ -142,10 +143,11 @@ Antes de avanzar a cámara y timeline, la ronda mínima es:
 3. Mover, rotar, escalar, ocultar y duplicar cada actor.
 4. Comparar un actor **estático** con otro **dinámico**.
 5. Guardar la puesta, salir del Escenario y restaurarla.
-6. Confirmar que transforms, nombres, visibilidad y tipo de actuación sobreviven.
+6. Confirmar que transforms, nombres, visibilidad, tipo de actuación, rutas, LFOs y acumuladores sobreviven.
 7. Repetir con 10 actores y observar si la interfaz se bloquea durante la entrada progresiva.
 8. Importar un GLB en Trazo y Grafito, guardar su ficha, recargarla y añadirla al Escenario: debe conservar el modelo importado.
 9. Exportar una escena con una supershape y un GLB de Trazo y Grafito: el HTML debe mostrar ambos.
+10. Quitar un actor que tenga una ruta, un LFO y un acumulador: los tres deben desaparecer de sus paneles.
 
 Esta prueba valida los cimientos. La prueba de ópera —música, luces, cámara y coreografía temporal— se añadirá cuando esas piezas existan.
 

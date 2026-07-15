@@ -9,7 +9,7 @@
 
 ---
 
-## Punto de control actual — Escenario v2
+## Punto de control actual — Escenario v3
 
 Sí, **es momento de probar**. La ronda actual no pretende validar todavía la ópera completa: valida que el reparto y el escenario sean suficientemente sólidos para recibir cámara, luces y timeline.
 
@@ -43,6 +43,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P11 | 🟡 | Exportar supershape + GLB de Trazo | El HTML debe reconstruir los dos actores; Delaunay/Relieve avisan que no se exportan aún |
 | P12 | ✅ | Destinos individuales de actor | La Mesa ofreció pose XYZ y expresiones; `ratón X → Marioneta · rotación Y` respondió de 0.19 a 0.72 sin errores |
 | P13 | 🟡 | Dos marionetas con micrófono | `audio ataque → escala Y` de una y `audio nivel → rotación Z` de otra; la escena global debe quedar quieta |
+| P14 | ✅ | Persistencia de la coreografía | Una ficha restauró actor, ruta `audio ataque → rotación Y`, LFO `→ rotación X` y acumulador `rotación X → escala Z`; quitar el actor limpió los tres motores |
 
 **Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
@@ -65,6 +66,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | 14-07-2026 | `codex/escenario-v2` | P1–P9: dos familias, persistencia, 10 actores, 3 reentradas y export | P1/P2/P3/P5/P8 ✅ · P4/P6/P7/P9 🟡 |
 | 15-07-2026 | `codex/escenario-v2` | Fichas conservan GLB de Trazo, polaridad de papel/grafito y export de GLB embebido | Compilación ✅ · P10/P11 🟡 para validación visual |
 | 15-07-2026 | `main` | Hilos de pose y expresión por actor conectados a LFO, memoria y sinestesia | P12 ✅ · P13 🟡 para prueba visual con micrófono |
+| 15-07-2026 | `main` | DocumentoEscena v3: rutas, LFOs y acumuladores persistentes; limpieza de huérfanos | P14 ✅ en navegador integrado · TypeScript/build ✅ |
 
 ---
 
@@ -122,11 +124,13 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E9 | Mesa de Sinestesia en el Escenario | El destino distingue escena global y cada actor por nombre |
 | E10 | Actor estático con ruta a transform | Se mueve por posición/rotación/escala sin reactivar su cálculo interno |
 | E11 | Intentar modular topología con audio | Resolución, puntos y semilla no aparecen entre los hilos de actor |
+| E12 | Guardar escena con ruta + LFO + acumulador, vaciarlos y restaurar | Los tres reaparecen con fuente, destino y configuración; los monitores vivos arrancan limpios |
+| E13 | Quitar un actor usado por los tres motores | Sus rutas, LFOs y acumuladores desaparecen y no dejan modulación residual |
 
 ## Cierre
 
 - Hallazgos → se arreglan en el momento o se anotan aquí con ❌ y ticket en el plan.
-- P13 valida el cierre de la marioneta; después comienza **DocumentoEscena v3 + transporte mínimo**, según `RUTA_AL_VIDEOCLIP.md`.
+- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3**. El siguiente bloque de construcción es el transporte musical mínimo.
 - Después de cada sesión se actualizan estados y se añade una fila al **Registro de rondas**.
 
 ---

@@ -24,6 +24,7 @@ export class MotorLFO {
   lfos: LFO[] = [];
   private destinoPrevio = new Map<string, string>();
   private secuencia = 1;
+  private escuchasCambio = new Set<() => void>();
 
   constructor(private bus: ParamBus) {}
 
@@ -39,6 +40,7 @@ export class MotorLFO {
       activo: true,
     };
     this.lfos.push(lfo);
+    this.emitirCambio();
     return lfo;
   }
 
@@ -46,6 +48,45 @@ export class MotorLFO {
     this.lfos = this.lfos.filter((l) => l.id !== id);
     this.bus.limpiarFuente(id);
     this.destinoPrevio.delete(id);
+    this.emitirCambio();
+  }
+
+  onCambio(fn: () => void): () => void {
+    this.escuchasCambio.add(fn);
+    return () => this.escuchasCambio.delete(fn);
+  }
+
+  /** Recompone opciones de UI cuando aparecen/desaparecen hilos de actores. */
+  refrescarDestinos(): void {
+    this.emitirCambio();
+  }
+
+  exportar(filtro: (lfo: LFO) => boolean = () => true): LFO[] {
+    return this.lfos.filter(filtro).map((lfo) => ({ ...lfo }));
+  }
+
+  restaurar(lfos: LFO[]): void {
+    for (const actual of this.lfos) this.bus.limpiarFuente(actual.id);
+    this.destinoPrevio.clear();
+    this.lfos = lfos.map((lfo) => ({ ...lfo }));
+    this.secuencia = siguienteSecuencia('lfo-', this.lfos.map((l) => l.id));
+    this.emitirCambio();
+  }
+
+  eliminarDonde(predicado: (lfo: LFO) => boolean): void {
+    const borrar = this.lfos.filter(predicado);
+    if (!borrar.length) return;
+    for (const lfo of borrar) {
+      this.bus.limpiarFuente(lfo.id);
+      this.destinoPrevio.delete(lfo.id);
+    }
+    const ids = new Set(borrar.map((l) => l.id));
+    this.lfos = this.lfos.filter((l) => !ids.has(l.id));
+    this.emitirCambio();
+  }
+
+  private emitirCambio(): void {
+    for (const fn of this.escuchasCambio) fn();
   }
 
   /** Un tick por frame: escribe los desplazamientos de todos los LFOs. */
@@ -102,4 +143,8 @@ function valueNoise(x: number): number {
 function azar(i: number): number {
   const s = Math.sin(i * 127.1 + 311.7) * 43758.5453;
   return (s - Math.floor(s)) * 2 - 1;
+}
+
+function siguienteSecuencia(prefijo: string, ids: string[]): number {
+  return Math.max(0, ...ids.map((id) => id.startsWith(prefijo) ? Number(id.slice(prefijo.length)) || 0 : 0)) + 1;
 }

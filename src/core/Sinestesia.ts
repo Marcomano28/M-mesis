@@ -24,6 +24,8 @@ export interface RutaSinestesia {
   valor: number;  // 0..1, valor suavizado de la fuente
 }
 
+export type RutaSinestesiaGuardada = Omit<RutaSinestesia, 'valor'>;
+
 export class MotorSinestesia {
   rutas: RutaSinestesia[] = [];
   estado = {
@@ -48,6 +50,7 @@ export class MotorSinestesia {
   private analizador: AnalyserNode | null = null;
   private datosAudio: Float32Array<ArrayBuffer> | null = null;
   private nivelAudioPrevio = 0;
+  private escuchasCambio = new Set<() => void>();
 
   constructor(private bus: ParamBus) {
     window.addEventListener('pointermove', (ev) => {
@@ -116,6 +119,7 @@ export class MotorSinestesia {
       valor: 0.5,
     };
     this.rutas.push(ruta);
+    this.emitirCambio();
     return ruta;
   }
 
@@ -123,6 +127,45 @@ export class MotorSinestesia {
     this.rutas = this.rutas.filter((r) => r.id !== id);
     this.bus.limpiarFuente(id);
     this.destinoPrevio.delete(id);
+    this.emitirCambio();
+  }
+
+  onCambio(fn: () => void): () => void {
+    this.escuchasCambio.add(fn);
+    return () => this.escuchasCambio.delete(fn);
+  }
+
+  /** Recompone opciones de UI cuando aparecen/desaparecen hilos de actores. */
+  refrescarDestinos(): void {
+    this.emitirCambio();
+  }
+
+  exportar(filtro: (ruta: RutaSinestesia) => boolean = () => true): RutaSinestesiaGuardada[] {
+    return this.rutas.filter(filtro).map(({ valor: _valor, ...ruta }) => ({ ...ruta }));
+  }
+
+  restaurar(rutas: RutaSinestesiaGuardada[]): void {
+    for (const actual of this.rutas) this.bus.limpiarFuente(actual.id);
+    this.destinoPrevio.clear();
+    this.rutas = rutas.map((ruta) => ({ ...ruta, valor: 0.5 }));
+    this.secuencia = siguienteSecuencia('syn-', this.rutas.map((r) => r.id));
+    this.emitirCambio();
+  }
+
+  eliminarDonde(predicado: (ruta: RutaSinestesia) => boolean): void {
+    const borrar = this.rutas.filter(predicado);
+    if (!borrar.length) return;
+    for (const ruta of borrar) {
+      this.bus.limpiarFuente(ruta.id);
+      this.destinoPrevio.delete(ruta.id);
+    }
+    const ids = new Set(borrar.map((r) => r.id));
+    this.rutas = this.rutas.filter((r) => !ids.has(r.id));
+    this.emitirCambio();
+  }
+
+  private emitirCambio(): void {
+    for (const fn of this.escuchasCambio) fn();
   }
 
   tick(dt: number, tiempo: number): void {
@@ -196,4 +239,8 @@ function aplicarCurva(v: number, curva: CurvaSinestesia): number {
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
+}
+
+function siguienteSecuencia(prefijo: string, ids: string[]): number {
+  return Math.max(0, ...ids.map((id) => id.startsWith(prefijo) ? Number(id.slice(prefijo.length)) || 0 : 0)) + 1;
 }

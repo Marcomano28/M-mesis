@@ -11,6 +11,9 @@ import { Pane } from 'tweakpane';
 import * as THREE from 'three/webgpu';
 import type { Salon, Params, ParamDef, FichaParaSalon, HiloModulable } from '../../core/Salon';
 import type { ParamBus } from '../../core/ParamBus';
+import type { MotorSinestesia } from '../../core/Sinestesia';
+import type { MotorLFO } from '../../core/Moduladores';
+import type { MotorAcumuladores } from '../../core/Acumuladores';
 import {
   crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
   type ActorEscena, type DocumentoEscena,
@@ -23,6 +26,12 @@ interface ActorVivo {
   folder: { dispose(): void };
   /** Objeto estable: se actualiza en sitio para no generar basura cada frame. */
   paramsActuales: Params;
+}
+
+interface MotoresActuacion {
+  sinestesia: MotorSinestesia;
+  lfo: MotorLFO;
+  acumuladores: MotorAcumuladores;
 }
 
 const TRANSFORM_HILOS = [
@@ -68,6 +77,7 @@ export class EscenarioSalon implements Salon {
   constructor(
     private fabricas: Record<string, (ficha: FichaParaSalon) => Salon>,
     private bus: ParamBus,
+    private motores: MotoresActuacion,
   ) {}
 
   init(escena: THREE.Scene, camara: THREE.PerspectiveCamera): void {
@@ -130,7 +140,7 @@ export class EscenarioSalon implements Salon {
       folder.addBinding(def, 'actividad', {
         label: 'actuación',
         options: { 'estático (ahorra)': 'estatico', 'dinámico': 'dinamico' },
-      });
+      }).on('change', () => this.notificarDestinos());
       folder.addBinding(t, 'x', { min: -8, max: 8, step: 0.01 }).on('change', cambioTransform('x'));
       folder.addBinding(t, 'y', { min: -8, max: 8, step: 0.01 }).on('change', cambioTransform('y'));
       folder.addBinding(t, 'z', { min: -8, max: 8, step: 0.01 }).on('change', cambioTransform('z'));
@@ -144,6 +154,7 @@ export class EscenarioSalon implements Salon {
       folder.addButton({ title: '✕ Quitar del escenario' }).on('click', () => this.quitar(def));
 
       this.vivos.push(vivo);
+      this.notificarDestinos();
       // Incluso un actor estático necesita un primer pase para configurar sus
       // uniforms y hornear la geometría derivada de la ficha.
       salon.update(0, 0, this.paramsActor(vivo));
@@ -171,9 +182,11 @@ export class EscenarioSalon implements Salon {
 
   private quitar(def: ActorEscena): void {
     this.documento.actores = this.documento.actores.filter((d) => d.id !== def.id);
+    this.limpiarRutasActor(def.id);
     const vivo = this.vivos.find((v) => v.def.id === def.id);
     if (vivo) this.desmontar(vivo);
     this.vivos = this.vivos.filter((v) => v.def.id !== def.id);
+    this.notificarDestinos();
   }
 
   private desmontar(vivo: ActorVivo): void {
@@ -182,6 +195,7 @@ export class EscenarioSalon implements Salon {
     } catch (err) {
       console.error('Error al desmontar actor:', err);
     }
+    this.bus.limpiarDirecciones(`actor:${vivo.def.id}.`);
     this.raiz.remove(vivo.envoltura);
     vivo.folder.dispose();
   }
@@ -274,6 +288,25 @@ export class EscenarioSalon implements Salon {
     return `actor:${actorId}.param.${clave}`;
   }
 
+  private esHiloDeEstaEscena(direccion: string): boolean {
+    if (direccion.startsWith('escenario.')) return true;
+    return this.documento.actores.some((actor) => direccion.startsWith(`actor:${actor.id}.`));
+  }
+
+  private limpiarRutasActor(actorId: string): void {
+    const prefijo = `actor:${actorId}.`;
+    this.motores.sinestesia.eliminarDonde((ruta) => ruta.destino.startsWith(prefijo));
+    this.motores.lfo.eliminarDonde((lfo) => lfo.destino.startsWith(prefijo));
+    this.motores.acumuladores.eliminarDonde((a) =>
+      a.destino.startsWith(prefijo) || a.fuente.startsWith(prefijo));
+  }
+
+  private notificarDestinos(): void {
+    this.motores.sinestesia.refrescarDestinos();
+    // PanelModuladores escucha al MotorLFO y reconstruye LFOs + acumuladores.
+    this.motores.lfo.refrescarDestinos();
+  }
+
   dispose(escena: THREE.Scene): void {
     this.generacionMontaje++;
     for (const v of this.vivos) this.desmontar(v);
@@ -296,6 +329,11 @@ export class EscenarioSalon implements Salon {
       objetivo: [...this.documento.camara.objetivo],
       fov: this.camara.fov,
     };
+    this.documento.actuacion = {
+      rutas: this.motores.sinestesia.exportar((ruta) => this.esHiloDeEstaEscena(ruta.destino)),
+      lfos: this.motores.lfo.exportar((lfo) => this.esHiloDeEstaEscena(lfo.destino)),
+      acumuladores: this.motores.acumuladores.exportar((a) => this.esHiloDeEstaEscena(a.destino)),
+    };
     return structuredClone(this.documento);
   }
 
@@ -307,6 +345,9 @@ export class EscenarioSalon implements Salon {
     for (const v of this.vivos) this.desmontar(v);
     this.vivos = [];
     this.documento = documento;
+    this.motores.sinestesia.restaurar(documento.actuacion.rutas);
+    this.motores.lfo.restaurar(documento.actuacion.lfos);
+    this.motores.acumuladores.restaurar(documento.actuacion.acumuladores);
     this.camara.position.fromArray(documento.camara.posicion);
     this.camara.fov = documento.camara.fov;
     this.camara.lookAt(...documento.camara.objetivo);

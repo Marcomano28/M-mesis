@@ -45,12 +45,13 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 | Salón **Bajo Relieve** | ✅ | Extrusión por estela del puntero (canvas 2D→textura); 6 niveles de textura + paleta cosenoidal; pestaña wireframe; GLB por defecto en `public/` |
 | Salón **Delaunay** | ✅ GPU | Triangulación (Delaunator, CPU) + anidado instanciado en GPU (TSL); figura Plano/Room (cara apagable); degradado de color y extrude dentro/fuera por profundidad; poda LOD adaptativa por área de triángulo |
 | **Fichas** (cajonera) | ✅ | Captura de miniatura sincronizada con el frame WebGPU; IndexedDB; cargar/borrar; los paneles respetan valores cargados |
-| **El Escenario v2** | ✅ | Actores con ID estable, transform XYZ, visibilidad, duplicación, actividad estática/dinámica y entrada progresiva |
+| **El Escenario v3** | ✅ | Actores con ID estable, transform XYZ, visibilidad, duplicación, actividad y actuación persistente |
 | **Hilos individuales** | ✅ | Pose y expresiones seguras direccionadas como `actor:<id>...`; ratón, LFO, memoria y audio pueden actuar por personaje |
 | **Escenas como fichas** | ✅ | ☆ guarda DocumentoEscena, actores y assets GLB de Trazo; clic en la card restaura la puesta |
 | **Export HTML del Escenario** | 🟡 | Reproduce Formas Exóticas y Trazo/GLB con transforms. Delaunay, Relieve, rutas, cámara de obra y runtime musical aún no están unificados |
 | **Moduladores (LFOs)** | ✅ | Base + Σ desplazamientos con clamp; cinco ondas y destinos de salón/actor |
-| **Mesa de Sinestesia** | ✅ MVP | Micrófono, MIDI, ratón y pulso → destino con rango, curva, ataque y caída; falta persistencia y matriz de grupos |
+| **Mesa de Sinestesia** | ✅ MVP | Micrófono, MIDI, ratón y pulso → destino con rango, curva, ataque y caída; las rutas viajan con la escena; falta matriz de grupos |
+| **Coreografía persistente** | ✅ MVP | DocumentoEscena v3 guarda/restaura rutas, LFOs y acumuladores y limpia referencias al quitar actores |
 | Cargador GLB compartido | ✅ | Draco local; Trazo guarda el binario en ficha y lo transporta al Escenario/export |
 | Exportador «Imprimir» por salón | ✅ v1 | HTML autocontenido vía CDN con valores horneados |
 | Panel de errores en pantalla | ✅ | Excepciones, promesas y console.error visibles; el loop sobrevive a fallos de un salón |
@@ -133,7 +134,7 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 
 **Etapa 2 — El Barniz v1** *(la gramática estética)*
 - Ficha de barniz: paleta (rangos), gramática de movimiento (suavizados globales asimétricos), materia (vistas/grano), presupuesto de caos. Aplicable sobre cualquier salón o escena; slider de interpolación entre dos barnices.
-- Pendiente heredado: moduladores y rutas guardados en fichas. Los transforms de actores ya están ruteados por el bus.
+- Los transforms de actores y la actuación ya viajan en DocumentoEscena v3; el Barniz podrá apoyarse en ese contrato persistente.
 - *Criterio:* la misma escena atravesando dos barnices produce dos mundos reconocibles.
 
 **Etapa 3 — El protocolo de la Semilla** *(la dramaturgia)*
@@ -145,7 +146,7 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - *Criterio:* rasgos visibles en vivo; onset→pulso visual sintiéndose instantáneo.
 
 **Etapa 5 — La Matriz de Mapeo** *(el oído aprende a traducir)*
-- Mesa v1 operativa ✅: fuente, destino individual/global, curva, rango y suavizado asimétrico. Falta matriz 1:N/N:1, grupos, persistencia y fichas de sinestesia ancladas en la matemática compartida.
+- Mesa v1 operativa ✅: fuente, destino individual/global, curva, rango, suavizado asimétrico y persistencia dentro de la escena. Falta matriz 1:N/N:1, grupos y fichas de sinestesia independientes ancladas en la matemática compartida.
 - *Criterio:* cambiar de ficha de sinestesia en vivo transforma el carácter del viaje sin tocar código.
 
 **Etapa 6 — Los Gestos** *(el vocabulario del músico)*
@@ -215,7 +216,7 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - **Exportador del Escenario**: las plantillas parciales divergen del editor. Debe extraerse un runtime único usado por editor, replay, HTML y render.
 - **Fichas y assets**: Trazo ya guarda GLB; falta deduplicación por hash y aplicar el mismo contrato a Bajo Relieve.
 - **Captura**: la toma directa preserva la espontaneidad pero también los frames perdidos. Se combinará con replay determinista para master.
-- **Rutas**: funcionan en vivo pero aún no viajan en DocumentoEscena; esta es la próxima migración estructural.
+- **Rutas**: ya viajan en DocumentoEscena v3; la siguiente ampliación será separar ensayo/obra y añadir grupos y mezcla 1:N/N:1.
 - **Puntos en WebGPU**: tamaño fijo 1px por diseño de la API — resolver con sprites instanciados cuando toque (habilita además tamaño por punto modulable).
 - **Crecimiento del panel de actores**: con >10 actores hará falta agrupar/plegar; evaluar entonces si el Escenario merece UI propia fuera de Tweakpane.
 

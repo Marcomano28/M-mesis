@@ -1,7 +1,7 @@
 # MIA — Ruta al videoclip interpretado
 ### De una escena reactiva a una toma audiovisual única, reproducible y masterizable
 
-*Versión 1.0 · 15 de julio de 2026 · documento técnico de destino*
+*Versión 1.1 · 15 de julio de 2026 · documento técnico de destino*
 
 Este documento responde una pregunta concreta: **¿puede MIA producir un videoclip musical a partir de una improvisación en tiempo real?**
 
@@ -39,7 +39,7 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 |---|---|---|
 | Salones y fichas | ✅ | Vocabulario visual creado por el autor |
 | GLB dentro de fichas de Trazo | ✅ | Assets acompañan al personaje hasta la escena |
-| DocumentoEscena v2 | ✅ | Identidad estable, reparto, transforms y cámara inicial |
+| DocumentoEscena v3 | ✅ | Reparto, transforms, cámara inicial y configuración de actuación |
 | Actores estáticos/dinámicos | ✅ | Presupuesto de CPU/GPU controlable |
 | Hilos por actor | ✅ | Pose XYZ y expresiones internas direccionables |
 | ParamBus base + modulaciones | ✅ | La actuación no destruye la composición original |
@@ -48,7 +48,7 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 | Mesa de Sinestesia | ✅ MVP | Curva, rango, ataque y caída por ruta |
 | Export HTML de escena | 🟡 | Reproduce Formas Exóticas y Trazo/GLB; no es aún el runtime completo |
 | Transporte musical | ⬜ | Falta reloj maestro, play/stop, compás y posición |
-| Persistencia de rutas | ⬜ | La coreografía viva todavía se pierde al cerrar |
+| Persistencia de rutas | ✅ MVP | Rutas, LFOs y acumuladores viajan con la ficha; los valores vivos se reinician |
 | Cámara/luz direccionables | ⬜ | Falta lenguaje cinematográfico |
 | Grabación de performance | ⬜ | Falta registrar audio, rasgos, cues y decisiones |
 | Captura audiovisual | ⬜ | Falta grabador, sincronía, codecs y control de carga |
@@ -172,19 +172,20 @@ interface TomaPerformance {
 
 **Salida:** runtime de actor confiable.
 
-### P1 — DocumentoEscena v3: guardar la coreografía
+### P1 — DocumentoEscena v3: guardar la coreografía ✅ MVP
 
 **Objetivo:** que una ficha de Escenario restaure reparto **y** manera de tocarlo.
 
-- Añadir `rutas`, grupos y configuración de sinestesia al documento.
-- Migración explícita v2 → v3.
-- Guardar/restaurar LFO, acumuladores y rutas de audio sin guardar el valor instantáneo.
-- Resolver rutas huérfanas cuando se elimina un actor.
-- Separar rutas propias de la escena de rutas temporales de ensayo.
+- Añadido el bloque `actuacion` con rutas, LFOs y acumuladores.
+- Migración explícita v1/v2 → v3, sin invalidar fichas antiguas.
+- Guardado y restauración sin serializar valores instantáneos ni memoria interna.
+- Limpieza automática de rutas, LFOs y acumuladores cuando se elimina su actor.
+- El guardado filtra por direcciones de la escena activa (`escenario.*` y sus IDs de actor), evitando capturar motores de otros salones.
+- Pendiente de la Matriz v2: grupos de reparto y una capa explícita de rutas temporales de ensayo.
 
 **Código principal:** `core/DocumentoEscena.ts`, `core/Sinestesia.ts`, `core/Moduladores.ts`, `salones/escenario/EscenarioSalon.ts`.
 
-**Criterio:** guardar una escena, recargar el navegador y recuperar la misma matriz actor/fuente.
+**Criterio alcanzado:** guardar una escena, vaciar los motores y recuperar actor, ruta de audio, LFO y acumulador con las mismas fuentes y destinos.
 
 ### P2 — Transporte musical y reloj único
 
@@ -356,16 +357,15 @@ Este MVP ya sería una obra: no una demostración de tecnología, sino una inter
 
 ## 9. Orden inmediato recomendado
 
-El orden que reduce más riesgos es:
+El orden que reduce más riesgos, una vez completado DocumentoEscena v3, es:
 
-1. **Validar P13**: dos actores, dos rutas, escena global quieta.
-2. **DocumentoEscena v3**: guardar rutas y resolver rutas huérfanas.
-3. **Transporte mínimo**: play/stop/record y reloj de audio.
-4. **Registro de performance**: eventos con timestamps y replay sin micrófono.
-5. **Cámara de obra direccionable**.
-6. **Grabación directa** con `captureStream` + `MediaRecorder`.
-7. **Oído AudioWorklet** y calibración.
-8. **Master determinista** mediante replay y encoder.
+1. **Transporte mínimo**: preparar/play/stop y reloj de audio compartido.
+2. **Registro de performance**: eventos con timestamps y replay sin micrófono.
+3. **Cámara de obra direccionable**.
+4. **Grabación directa** con `captureStream` + `MediaRecorder`.
+5. **Oído AudioWorklet** y calibración.
+6. **Master determinista** mediante replay y encoder.
+7. **Matriz v2**: grupos, rutas 1:N/N:1 y modos de ensayo.
 
 No conviene construir todavía el Director de IA ni ampliar mucho el catálogo de salones. Primero hay que conseguir que una interpretación pequeña pueda **guardarse, repetirse y filmarse**.
 

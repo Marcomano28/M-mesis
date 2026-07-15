@@ -33,15 +33,24 @@ const fabricas = {
   delaunay: () => new DelaunaySalon(),
 };
 
+// Los motores existen antes que el Escenario para que DocumentoEscena v3
+// pueda guardar y restaurar la manera de tocar cada actor.
+const motorLFO = new MotorLFO(bus);
+const motorAcum = new MotorAcumuladores(bus);
+const motorSinestesia = new MotorSinestesia(bus);
+const escenario = new EscenarioSalon(fabricas, bus, {
+  sinestesia: motorSinestesia,
+  lfo: motorLFO,
+  acumuladores: motorAcum,
+});
+
 const galeria = new Galeria(
-  [new SupershapesSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), new EscenarioSalon(fabricas, bus)],
+  [new SupershapesSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), escenario],
   engine,
   bus,
 );
 
 // Fuentes vivas: LFOs (oscilan) y Acumuladores (recuerdan — Etapa 1 del templo)
-const motorLFO = new MotorLFO(bus);
-const motorAcum = new MotorAcumuladores(bus);
 new PanelModuladores(motorLFO, motorAcum, () => galeria.destinosModulables());
 
 // La actividad del usuario alimenta a los acumuladores:
@@ -52,7 +61,6 @@ addEventListener('pointermove', (e) => {
 });
 
 // Primera mesa de mapeo: fuentes vivas normalizadas → parámetros visuales
-const motorSinestesia = new MotorSinestesia(bus);
 new PanelSinestesia(motorSinestesia, () => galeria.destinosModulables());
 
 // Acceso de depuración desde la consola

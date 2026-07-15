@@ -124,7 +124,7 @@ Añadir un salón nuevo es crear su clase (implementando el contrato `Salon`) y 
 
 ## Estado
 
-El ciclo del taller y los hilos individuales están funcionando. En curso: guardar las rutas dentro de la escena, crear un transporte musical común, registrar la performance y capturar audio/vídeo. El destino y sus criterios técnicos están en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.
+El ciclo del taller, los hilos individuales y su persistencia en DocumentoEscena v3 están funcionando. El siguiente hito es crear un transporte musical común; después vendrán el registro de performance y la captura de audio/vídeo. El destino y sus criterios técnicos están en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.
 
 ---
 

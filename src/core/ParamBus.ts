@@ -56,6 +56,22 @@ export class ParamBus {
     for (const mapa of this.modulaciones.values()) mapa.delete(fuente);
   }
 
+  /** Retira por prefijo bases, rangos y modulaciones de un objeto destruido. */
+  limpiarDirecciones(prefijo: string): void {
+    for (const direccion of this.valores.keys()) {
+      if (direccion.startsWith(prefijo)) this.valores.delete(direccion);
+    }
+    for (const direccion of this.rangos.keys()) {
+      if (direccion.startsWith(prefijo)) this.rangos.delete(direccion);
+    }
+    for (const direccion of this.modulaciones.keys()) {
+      if (direccion.startsWith(prefijo)) this.modulaciones.delete(direccion);
+    }
+    for (const direccion of this.escuchas.keys()) {
+      if (direccion.startsWith(prefijo)) this.escuchas.delete(direccion);
+    }
+  }
+
   /** Valor final = base + Σ modulaciones, con clamp al rango si se conoce. */
   valorFinal(direccion: string, porDefecto = 0): number {
     let v = this.valores.get(direccion) ?? porDefecto;
