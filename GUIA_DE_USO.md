@@ -1,7 +1,7 @@
 # MIA — Guía de uso
 ### La ruta de acciones del taller
 
-*Documento vivo · actualizado el 14 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md*
+*Documento vivo · actualizado el 15 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md*
 
 **Estado actual:** camerinos, fichas y **Escenario v2** utilizables. Los actores ya tienen identidad, visibilidad, transform completo, duplicación y modo estático/dinámico. La cámara de obra, luces escénicas, vestuario por actor y timeline musical todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
 
@@ -37,7 +37,8 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria` y `motorLFO
 1. Elige salón en el selector.
 2. Mueve sliders. En salones con **pestañas** (p.ej. Clásica / SuperFlor), cada pestaña es una variante con sus propios parámetros.
 3. En Formas Exóticas, los controles comunes aplican a ambas variantes: **resolución** (densidad de la retícula), **exposición** (Puntos / Alambre / Caras) y **color**.
-4. Salones con modelos: **📦 Cargar modelo GLB…** abre el selector de archivos — vale cualquier .glb/.gltf de cualquier carpeta, comprimido con Draco o no. *(El GLB cargado vive solo en la sesión: aún no viaja en las fichas.)*
+4. Salones con modelos: **📦 Cargar modelo GLB…** abre el selector de archivos — vale cualquier .glb/.gltf de cualquier carpeta, comprimido con Draco o no. En **Trazo y Grafito**, el GLB importado queda dentro de la ficha: al guardarla, recargarla o mandarla al Escenario reaparece el mismo modelo, no el nudo de muestra.
+   - Trazo y Grafito comienza sin giro. Sus controles **fondo**, **líneas** y **polaridad** permiten invertir el papel y el grafito de un gesto.
    - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. El salón auto-orienta el relieve (su eje delgado mira a cámara).
 
 **Ruta corta:** `selector → pestaña → sliders → exposición/color`
@@ -93,7 +94,7 @@ Reglas de la casa:
 ## 6. Imprimir (exportar)
 
 - **En un salón**: ⎙ descarga un HTML autocontenido (Three.js por CDN) que reproduce la figura con los valores horneados. Se abre con doble clic, sin instalar nada.
-- **En el Escenario**: ⎙ descarga la escena completa — figuras, vistas, colores, transforms y animación, con la partitura JSON embebida en el archivo. *(Límites v1: los actores con GLB se omiten; las caras usan Phong clásico, un tono más cálido.)*
+- **En el Escenario**: ⎙ descarga una composición HTML con la partitura JSON embebida. Reproduce Formas Exóticas y los actores de Trazo y Grafito, incluyendo su GLB guardado, transform y giro. *(Delaunay y Bajo Relieve aún no tienen reproductor autónomo en el HTML; se avisan en la consola en vez de sustituirse por otra figura.)*
 - **↓ Guardar preset**: el JSON de parámetros solo (re-importable vía consola: `MIA.bus.importarPreset(json)`).
 
 ---
@@ -133,5 +134,7 @@ Antes de avanzar a cámara y timeline, la ronda mínima es:
 5. Guardar la puesta, salir del Escenario y restaurarla.
 6. Confirmar que transforms, nombres, visibilidad y tipo de actuación sobreviven.
 7. Repetir con 10 actores y observar si la interfaz se bloquea durante la entrada progresiva.
+8. Importar un GLB en Trazo y Grafito, guardar su ficha, recargarla y añadirla al Escenario: debe conservar el modelo importado.
+9. Exportar una escena con una supershape y un GLB de Trazo y Grafito: el HTML debe mostrar ambos.
 
 Esta prueba valida los cimientos. La prueba de ópera —música, luces, cámara y coreografía temporal— se añadirá cuando esas piezas existan.

@@ -73,10 +73,19 @@ export function transformActorInicial(): TransformActor {
 export function crearActorEscena(ficha: FichaParaSalon): ActorEscena {
   return {
     id: crypto.randomUUID(),
-    ficha: { salonId: ficha.salonId, nombre: ficha.nombre, params: { ...ficha.params } },
+    ficha: copiarFicha(ficha),
     transform: transformActorInicial(),
     visible: true,
     actividad: 'dinamico',
+  };
+}
+
+function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
+  return {
+    salonId: ficha.salonId,
+    nombre: ficha.nombre,
+    params: { ...ficha.params },
+    extra: ficha.extra === undefined ? undefined : structuredClone(ficha.extra),
   };
 }
 
@@ -107,7 +116,7 @@ export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
       actores: d.actores.map((a) => ({
         ...a,
         id: a.id || crypto.randomUUID(),
-        ficha: { ...a.ficha, params: { ...a.ficha.params } },
+        ficha: copiarFicha(a.ficha),
         transform: { ...transformActorInicial(), ...a.transform },
         visible: a.visible !== false,
         actividad: a.actividad === 'estatico' ? 'estatico' : 'dinamico',

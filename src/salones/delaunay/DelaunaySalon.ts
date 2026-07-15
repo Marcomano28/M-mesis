@@ -44,8 +44,8 @@ export class DelaunaySalon implements Salon {
     { clave: 'umbral',   etiqueta: 'poda LOD',     valor: 0.05,   min: 0,   max: 0.5 },
     { clave: 'vista',    etiqueta: 'exposición',   valor: 1,      min: 0,   max: 2,   opciones: VISTA },
     { clave: 'modoEsc',  etiqueta: 'escala',       valor: 1,      min: 0,   max: 1,   opciones: MODO },
-    { clave: 'giro',     etiqueta: 'giro/nivel',   valor: 0.3,    min: -2,  max: 2 },
-    { clave: 'velGiro',  etiqueta: 'giro tiempo',  valor: 0.2,    min: 0,   max: 3 },
+    { clave: 'giro',     etiqueta: 'giro/nivel',   valor: 0,      min: -2,  max: 2 },
+    { clave: 'velGiro',  etiqueta: 'giro tiempo',  valor: 0,      min: 0,   max: 3 },
     { clave: 'sepZ',     etiqueta: 'separación Z',  valor: 0.03,  min: 0,   max: 0.3 },
     { clave: 'extrude',  etiqueta: 'extrude',      valor: 0,      min: 0,   max: 1,   opciones: EXTRUDE },
     { clave: 'escala',   etiqueta: 'escala global', valor: 2,     min: 0.2, max: 5 },
@@ -59,8 +59,8 @@ export class DelaunaySalon implements Salon {
   // (los niveles por triángulo viajan como atributo por-instancia `iMax`)
   private u = {
     modo:    uniform(1),
-    giro:    uniform(0.3),
-    velGiro: uniform(0.2),
+    giro:    uniform(0),
+    velGiro: uniform(0),
     sepZ:    uniform(0.03),
     dir:     uniform(1), // +1 extrude hacia afuera, −1 hacia adentro
     ampDeg:  uniform(0.7), // amplitud del degradado color→color2 por nivel
@@ -135,8 +135,8 @@ export class DelaunaySalon implements Salon {
 
     // — Uniforms —
     this.u.modo.value = p.modoEsc === 0 ? 0 : 1;
-    this.u.giro.value = p.giro ?? 0.3;
-    this.u.velGiro.value = p.velGiro ?? 0.2;
+    this.u.giro.value = p.giro ?? 0;
+    this.u.velGiro.value = p.velGiro ?? 0;
     this.u.sepZ.value = p.sepZ ?? 0.03;
     this.u.dir.value = p.extrude === 1 ? -1 : 1;
     this.u.ampDeg.value = p.ampDeg ?? 0.7;

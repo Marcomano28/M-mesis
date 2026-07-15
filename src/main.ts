@@ -27,8 +27,8 @@ await engine.init();
 const fabricas = {
   // En el escenario Formas Exóticas solo construye la familia usada por la
   // ficha, no los cuatro camerinos completos.
-  supershapes: (params?: Record<string, number>) => new SupershapesSalon(params?.modo),
-  crosshatch: () => new CrossHatchSalon(),
+  supershapes: (ficha: { params: Record<string, number> }) => new SupershapesSalon(ficha.params.modo),
+  crosshatch: (ficha: { extra?: unknown }) => new CrossHatchSalon(ficha.extra),
   bajorelieve: () => new BajoRelieveSalon(),
   delaunay: () => new DelaunaySalon(),
 };

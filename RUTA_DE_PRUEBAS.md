@@ -1,7 +1,7 @@
 # MIA — Ruta de pruebas
 ### Bitácora viva de validación
 
-*Actualizada el 14 de julio de 2026 · repetir y actualizar después de cada bloque funcional*
+*Actualizada el 15 de julio de 2026 · repetir y actualizar después de cada bloque funcional*
 
 **Reparto:** 🤖 = lo ejecuto yo vía extensión de Chrome (clics, JS, capturas) · 🧑‍🎨 = requiere tu mano/oído
 
@@ -39,8 +39,10 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P7 | 🟡 | Escena con 10 actores | Los 10 terminaron de montar sin errores; falta valorar fluidez y memoria en Chrome |
 | P8 | ✅ | Entrar/salir del Escenario tres veces | 10 actores exactos en los tres ciclos; sin duplicados, fantasmas ni errores |
 | P9 | 🟡 | Exportar escena con transforms XYZ | Corregida liberación prematura del Blob; descarga pendiente de verificar fuera del navegador integrado |
+| P10 | 🟡 | GLB de Trazo → ficha → Escenario | El mismo GLB debe reemplazar el nudo de muestra al montar el actor |
+| P11 | 🟡 | Exportar supershape + GLB de Trazo | El HTML debe reconstruir los dos actores; Delaunay/Relieve avisan que no se exportan aún |
 
-**Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 requiere abrir el HTML descargado. P6 necesita conservar o proporcionar una ficha de escena v1 real.
+**Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
 ### No probar todavía como funcionalidad terminada
 
@@ -59,6 +61,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 |---|---|---|---|
 | 14-07-2026 | `codex/escenario-v2` · `9d659a1` | Documento v2, diálogo, alta y duplicación de actores, guardado básico | Base técnica ✅ · ronda visual P1–P9 pendiente |
 | 14-07-2026 | `codex/escenario-v2` | P1–P9: dos familias, persistencia, 10 actores, 3 reentradas y export | P1/P2/P3/P5/P8 ✅ · P4/P6/P7/P9 🟡 |
+| 15-07-2026 | `codex/escenario-v2` | Fichas conservan GLB de Trazo, polaridad de papel/grafito y export de GLB embebido | Compilación ✅ · P10/P11 🟡 para validación visual |
 
 ---
 

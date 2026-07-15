@@ -31,6 +31,8 @@ export interface FichaParaSalon {
   salonId: string;
   nombre: string;
   params: Record<string, number>;
+  /** Datos no numéricos de la ficha (por ejemplo, el archivo GLB importado). */
+  extra?: unknown;
 }
 
 /** Pestaña del panel: un modo del salón con su propio juego de parámetros. */

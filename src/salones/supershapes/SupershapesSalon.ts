@@ -31,7 +31,7 @@ export class SupershapesSalon implements Salon {
 
   params: ParamDef[] = [
     { clave: 'escala',     etiqueta: 'escala',     valor: 2,    min: 0.2, max: 5 },
-    { clave: 'giro',       etiqueta: 'giro',       valor: 0.15, min: -2,  max: 2 },
+    { clave: 'giro',       etiqueta: 'giro',       valor: 0, min: -2,  max: 2 },
     { clave: 'resolucion', etiqueta: 'resolución', valor: 256,  min: 8,   max: 512, paso: 8 },
     { clave: 'vista',      etiqueta: 'exposición', valor: 0,    min: 0,   max: 2, opciones: VISTA },
     { clave: 'color',      etiqueta: 'color',      valor: 0xdfe6ff, min: 0, max: 0xffffff, tipo: 'color' },

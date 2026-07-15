@@ -17,8 +17,15 @@ export function crearLoaderGLB(): GLTFLoader {
   return loader;
 }
 
-/** Abre un selector de archivo .glb/.gltf y entrega la escena parseada. */
-export function elegirYCargarGLB(alCargar: (escena: import('three').Object3D) => void): void {
+export interface ModeloGLBCargado {
+  escena: import('three').Object3D;
+  nombre: string;
+  /** Copia binaria para que el salón pueda guardarla dentro de su ficha. */
+  datos: ArrayBuffer;
+}
+
+/** Abre un selector de archivo .glb/.gltf y entrega escena y bytes originales. */
+export function elegirYCargarGLB(alCargar: (modelo: ModeloGLBCargado) => void): void {
   const input = Object.assign(document.createElement('input'), {
     type: 'file',
     accept: '.glb,.gltf',
@@ -27,8 +34,9 @@ export function elegirYCargarGLB(alCargar: (escena: import('three').Object3D) =>
     const archivo = input.files?.[0];
     if (!archivo) return;
     try {
-      const gltf = await crearLoaderGLB().parseAsync(await archivo.arrayBuffer(), '');
-      alCargar(gltf.scene);
+      const datos = await archivo.arrayBuffer();
+      const gltf = await crearLoaderGLB().parseAsync(datos.slice(0), '');
+      alCargar({ escena: gltf.scene, nombre: archivo.name, datos });
     } catch (err) {
       console.error('Error cargando GLB:', err);
     }

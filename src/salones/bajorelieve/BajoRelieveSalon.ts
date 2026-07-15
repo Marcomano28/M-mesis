@@ -197,7 +197,7 @@ export class BajoRelieveSalon implements Salon {
   }
 
   private cargarGLB(): void {
-    elegirYCargarGLB((escena) => this.montarModelo(escena));
+    elegirYCargarGLB(({ escena }) => this.montarModelo(escena));
   }
 
   private montarModelo(modelo: THREE.Object3D): void {

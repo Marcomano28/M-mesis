@@ -42,7 +42,7 @@ export class EscenarioSalon implements Salon {
   private generacionMontaje = 0;
 
   /** fábricas: salonId → instancia ligera preparada para la receta del actor. */
-  constructor(private fabricas: Record<string, (params?: Params) => Salon>) {}
+  constructor(private fabricas: Record<string, (ficha: FichaParaSalon) => Salon>) {}
 
   init(escena: THREE.Scene, camara: THREE.PerspectiveCamera): void {
     this.escena = escena;
@@ -87,7 +87,7 @@ export class EscenarioSalon implements Salon {
       return;
     }
     try {
-      const salon = fabrica(def.ficha.params);
+      const salon = fabrica(def.ficha);
       const envoltura = new THREE.Group();
       salon.init(envoltura as unknown as THREE.Scene, this.camara);
       this.raiz.add(envoltura);
@@ -128,7 +128,12 @@ export class EscenarioSalon implements Salon {
     const copia: ActorEscena = {
       ...def,
       id: crypto.randomUUID(),
-      ficha: { ...def.ficha, nombre: `${def.ficha.nombre} copia`, params: { ...def.ficha.params } },
+      ficha: {
+        ...def.ficha,
+        nombre: `${def.ficha.nombre} copia`,
+        params: { ...def.ficha.params },
+        extra: def.ficha.extra === undefined ? undefined : structuredClone(def.ficha.extra),
+      },
       transform: { ...def.transform, x: def.transform.x + 0.4 },
     };
     this.documento.actores.push(copia);
@@ -213,8 +218,8 @@ export class EscenarioSalon implements Salon {
   }
 
   // ————— Exportador: HTML autocontenido que reconstruye la escena —————
-  // v1 soporta actores de Formas Exóticas (clásica y superflor) con sus
-  // vistas y colores. Los salones con GLB (trazo/relieve) se omiten con aviso.
+  // Incluye las recetas de Formas Exóticas y los GLB guardados de Trazo y
+  // Grafito. Otros salones se identifican en la consola para no ocultarlos.
 
   exportar(p: Params): string {
     const escena = {
@@ -229,10 +234,24 @@ export class EscenarioSalon implements Salon {
           escalaX: d.transform.escalaX, escalaY: d.transform.escalaY, escalaZ: d.transform.escalaZ,
         },
         visible: d.visible,
+        modeloGLB: serializarModeloGLB(d.ficha.extra),
       })),
     };
     return PLANTILLA_ESCENA.replaceAll('__ESCENA__', JSON.stringify(escena));
   }
+}
+
+function serializarModeloGLB(extra: unknown): string | null {
+  if (!extra || typeof extra !== 'object') return null;
+  const datos = (extra as { tipo?: unknown; datos?: unknown }).datos;
+  if ((extra as { tipo?: unknown }).tipo !== 'mia-glb' || !(datos instanceof ArrayBuffer)) return null;
+  const bytes = new Uint8Array(datos);
+  const bloque = 0x8000;
+  let binario = '';
+  for (let inicio = 0; inicio < bytes.length; inicio += bloque) {
+    binario += String.fromCharCode(...bytes.subarray(inicio, inicio + bloque));
+  }
+  return btoa(binario);
 }
 
 // La partitura JSON queda embebida en el HTML: el archivo es a la vez
@@ -244,6 +263,7 @@ const PLANTILLA_ESCENA = `<!doctype html>
 </head><body><script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const E = __ESCENA__;
 
 // ——— matemática de Formas Exóticas ———
@@ -295,12 +315,44 @@ function malla(fn, n1, n2){
 const escena = new THREE.Scene();
 const raiz = new THREE.Group(); escena.add(raiz);
 const animados = [];
+const aplicarActor = (actor, figura) => {
+  const envoltura = new THREE.Group(), t = actor.transform;
+  envoltura.position.set(t.x, t.y, t.z);
+  envoltura.rotation.set(t.rotX ?? 0, t.rotY ?? 0, t.rotZ ?? 0);
+  envoltura.scale.set(t.escalaX ?? 1, t.escalaY ?? 1, t.escalaZ ?? 1);
+  envoltura.visible = actor.visible !== false;
+  envoltura.add(figura); raiz.add(envoltura);
+};
+const bytesDesdeBase64 = (texto) => {
+  const binario = atob(texto), bytes = new Uint8Array(binario.length);
+  for (let i=0; i<binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes.buffer;
+};
 for (const actor of E.actores){
-  if (actor.salon !== 'supershapes'){
-    console.warn('Export v1: actor omitido (salón con assets externos):', actor.nombre, actor.salon);
+  const P = actor.params;
+  if (actor.salon === 'crosshatch') {
+    const figura = new THREE.Group();
+    const invertir = P.invertir === 1;
+    const colorLinea = invertir ? (P.fondo ?? 0xf3f0e8) : (P.tinta ?? 0x21212b);
+    const mat = new THREE.MeshBasicMaterial({ color: colorLinea, wireframe: true });
+    const defecto = new THREE.Mesh(new THREE.TorusKnotGeometry(1, .35, 220, 36), mat);
+    figura.add(defecto); aplicarActor(actor, figura);
+    if (actor.modeloGLB) new GLTFLoader().parseAsync(bytesDesdeBase64(actor.modeloGLB), '').then((gltf) => {
+      const modelo = gltf.scene;
+      modelo.traverse(o => { if (o.isMesh) o.material = mat; });
+      const caja = new THREE.Box3().setFromObject(modelo);
+      const centro = caja.getCenter(new THREE.Vector3());
+      const dimension = caja.getSize(new THREE.Vector3()).length() || 1;
+      modelo.position.sub(centro); modelo.scale.setScalar(3.4 / dimension);
+      figura.clear(); figura.add(modelo);
+    }).catch(err => console.error('No se pudo restaurar el GLB exportado:', err));
+    animados.push({ figura, giro: P.giro ?? 0 });
     continue;
   }
-  const P = actor.params;
+  if (actor.salon !== 'supershapes') {
+    console.warn('Exportación parcial: este salón aún no tiene reproductor autónomo:', actor.nombre, actor.salon);
+    continue;
+  }
   const R = Math.min(Math.round(P.resolucion ?? 128), 192);
   const fn = (P.modo ?? 0) === 1 ? posFlor(P) : posClasica(P);
   const color = P.color ?? 0xdfe6ff;
@@ -317,14 +369,7 @@ for (const actor of E.actores){
   if ((P.modo ?? 0) === 1) objeto.rotation.x = 2.97;
   figura.add(objeto);
   figura.scale.setScalar(P.escala ?? 2);
-  const envoltura = new THREE.Group();
-  const t = actor.transform;
-  envoltura.position.set(t.x, t.y, t.z);
-  envoltura.rotation.set(t.rotX ?? 0, t.rotY ?? 0, t.rotZ ?? 0);
-  envoltura.scale.set(t.escalaX ?? 1, t.escalaY ?? 1, t.escalaZ ?? 1);
-  envoltura.visible = actor.visible !== false;
-  envoltura.add(figura);
-  raiz.add(envoltura);
+  aplicarActor(actor, figura);
   animados.push({ figura, giro: P.giro ?? 0 });
 }
 
