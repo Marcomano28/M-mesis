@@ -41,10 +41,10 @@ Una ramificación conceptual posible, desarrollada en el plan, es MIA como **lut
 
 | Salón | Qué hace |
 |---|---|
-| **Formas Exóticas** | Supershapes de Gielis evaluadas en el vertex shader. Variante *Clásica* (con divisores de eje a/b, perfiles θ/φ independientes, dominio angular configurable y modo *nautilus* espiral) y *SuperFlor* (superficie abierta combinada). Resolución 8–512, exposición Puntos/Alambre/Caras, color. |
-| **Trazo y Grafito** | Cross-hatching y lápiz *sketchy* procedural en TSL por niveles de luz, con temblor y grano. Importa modelos GLB. |
-| **Bajo Relieve** | Relieve revelado por la estela del puntero (canvas 2D → textura), con profundidad base, intensidad y radio regulables; paleta cosenoidal. Trae un GLB por defecto. |
-| **Delaunay** | Triangulación de Delaunay sobre un plano o una *room* (cubo con una cara apagable para ver dentro). Cada triángulo se dibuja con copias anidadas escaladas y giradas, instanciadas en la GPU en una sola *draw call*; degradado entre dos colores según la profundidad, extrude hacia dentro/fuera y poda LOD adaptativa. |
+| **Formas Exóticas** | Supershapes de Gielis evaluadas en el vertex shader. Variante *Clásica* (con divisores de eje a/b, perfiles θ/φ independientes, dominio angular configurable y modo *nautilus* espiral) y *SuperFlor* (superficie abierta combinada). Resolución 8–512, Puntos/Alambre/Caras/Ambos, color. |
+| **Trazo y Grafito** | Cross-hatching y lápiz *sketchy* procedural en TSL por niveles de luz, con temblor y grano. Importa modelos GLB; Caras/Alambre/Ambos, fondo y tinta. |
+| **Bajo Relieve** | Relieve revelado por la estela del puntero (canvas 2D → textura), con profundidad base, intensidad, radio y tinte regulables; Caras/Alambre/Ambos y paleta cosenoidal. Trae un GLB por defecto. |
+| **Delaunay** | Triangulación de Delaunay sobre un plano o una *room* (cubo con una cara apagable para ver dentro). Cada triángulo se dibuja con copias anidadas escaladas y giradas, instanciadas en la GPU en una sola *draw call*; degradado entre dos colores, extrude, poda LOD y Puntos/Alambre/Caras/Ambos. |
 | **El Escenario** | Coloca fichas como actores con identidad, pose XYZ y expresiones propias; las fuentes vivas pueden accionar sus hilos individualmente. |
 
 Salones planificados (ver plan): Materia de Puntos (compute shaders), Campos y Ruido, Líneas y Trazos, Materiales Imposibles, Luz y Atmósfera.

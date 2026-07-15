@@ -21,7 +21,7 @@ import Delaunator from 'delaunator';
 import type { Salon, Params, ParamDef, HiloFichaDef } from '../../core/Salon';
 
 const MODO = { Lineal: 0, Exponencial: 1 };
-const VISTA = { Puntos: 0, Alambre: 1, Caras: 2 };
+const VISTA = { Puntos: 0, Alambre: 1, Caras: 2, Ambos: 3 };
 const FIGURA = { Plano: 0, Room: 1 };
 const EXTRUDE = { Fuera: 0, Dentro: 1 };
 // Cara a apagar en la Room (índice en carasCubo) — −1 = ninguna (cubo cerrado).
@@ -51,7 +51,7 @@ export class DelaunaySalon implements Salon {
     { clave: 'caraOff',  etiqueta: 'cara apagada', valor: 0,      min: -1,  max: 5,   opciones: CARA },
     { clave: 'anidado',  etiqueta: 'anidado (máx)', valor: 8,     min: 1,   max: 30,  paso: 1 },
     { clave: 'umbral',   etiqueta: 'poda LOD',     valor: 0.05,   min: 0,   max: 0.5 },
-    { clave: 'vista',    etiqueta: 'exposición',   valor: 1,      min: 0,   max: 2,   opciones: VISTA },
+    { clave: 'vista',    etiqueta: 'exposición',   valor: 1,      min: 0,   max: 3,   opciones: VISTA },
     { clave: 'modoEsc',  etiqueta: 'escala',       valor: 1,      min: 0,   max: 1,   opciones: MODO },
     { clave: 'giro',     etiqueta: 'giro/nivel',   valor: 0,      min: -2,  max: 2 },
     { clave: 'velGiro',  etiqueta: 'giro tiempo',  valor: 0,      min: 0,   max: 3 },
@@ -135,11 +135,11 @@ export class DelaunaySalon implements Salon {
     }
 
     // — Exposición: solo la representación activa es visible —
-    const vista = p.vista === 0 ? 0 : p.vista === 2 ? 2 : 1;
+    const vista = p.vista === 3 ? 3 : p.vista === 2 ? 2 : p.vista === 0 ? 0 : 1;
     if (this.objs) {
       this.objs.puntos.visible = vista === VISTA.Puntos;
-      this.objs.alambre.visible = vista === VISTA.Alambre;
-      this.objs.caras.visible = vista === VISTA.Caras;
+      this.objs.alambre.visible = vista === VISTA.Alambre || vista === VISTA.Ambos;
+      this.objs.caras.visible = vista === VISTA.Caras || vista === VISTA.Ambos;
     }
 
     // — Uniforms —
@@ -396,8 +396,8 @@ const frame = (ms) => {
         for (const q of [p0, p1, p2]) { ctx.beginPath(); ctx.arc(q[0], q[1], P.puntoTam, 0, 2*Math.PI); ctx.fill(); }
       } else {
         ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]); ctx.closePath();
-        if (P.vista === 2) { ctx.fillStyle = col; ctx.fill(); } // Caras
-        else { ctx.strokeStyle = col; ctx.stroke(); }          // Alambre
+        if (P.vista === 2 || P.vista === 3) { ctx.fillStyle = col; ctx.fill(); }
+        if (P.vista === 1 || P.vista === 3) { ctx.strokeStyle = col; ctx.stroke(); }
       }
     }
   }

@@ -47,6 +47,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P15 | ✅ | Hilos seleccionados por ficha | Una ficha `🧵 1` ofreció en la Mesa únicamente `Actor un hilo · rotación Y`; la escena guardada conservó actor, selección y ruta |
 | P16 | ✅ | Transporte musical compartido | `preparado → reproduciendo → preparado`, avance 00:00→00:01.5 y compás 1·4 a 120 BPM; stop volvió a cero. Una escena restauró 90 BPM, 3 pulsos, 12 s y bucle apagado después de alterarlos |
 | P17 | 🟡 | GLB de Bajo Relieve → ficha → Escenario | El mismo GLB importado debe montar como actor, no volver a `/relieve.glb`; queda pendiente de comprobar con un archivo del usuario |
+| P18 | ✅ | Exposición y color coherentes | Formas, Trazo, Bajo Relieve y Delaunay muestran Alambre/Caras/Ambos; Formas y Delaunay conservan Puntos. Bajo Relieve añade tinte y Trazo conserva fondo/tinta |
 
 **Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 

@@ -21,6 +21,8 @@ import {
 import { crearLoaderGLB, elegirYCargarGLB } from '../../core/CargadorGLB';
 import type { Salon, Params, ParamDef, Accion, HiloFichaDef } from '../../core/Salon';
 
+const VISTA = { Alambre: 1, Caras: 2, Ambos: 3 };
+
 interface ModeloGuardado {
   tipo: 'mia-glb';
   version: 1;
@@ -63,6 +65,7 @@ export class CrossHatchSalon implements Salon {
     { clave: 'fondo',      etiqueta: 'fondo',          valor: 0xf3f0e8, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'tinta',      etiqueta: 'líneas',         valor: 0x21212b, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'invertir',   etiqueta: 'polaridad',      valor: 0, min: 0, max: 1, opciones: { normal: 0, invertida: 1 } },
+    { clave: 'vista',      etiqueta: 'exposición',     valor: 2, min: 1, max: 3, opciones: VISTA },
     { clave: 'giro',       etiqueta: 'giro',           valor: 0, min: -2,   max: 2 },
   ];
 
@@ -84,6 +87,9 @@ export class CrossHatchSalon implements Salon {
 
   private grupo = new THREE.Group();
   private material!: THREE.MeshBasicNodeMaterial;
+  private materialAlambre!: THREE.MeshBasicNodeMaterial;
+  private caras: THREE.Mesh[] = [];
+  private alambres: THREE.Mesh[] = [];
   private fondoPrevio: THREE.Color | THREE.Texture | null = null;
   private escena: THREE.Scene | null = null;
   private modeloGuardado: ModeloGuardado | null;
@@ -95,10 +101,12 @@ export class CrossHatchSalon implements Salon {
   init(escena: THREE.Scene): void {
     this.escena = escena;
     this.material = this.crearMaterial();
+    this.materialAlambre = this.crearMaterial(true);
 
     // Modelo por defecto mientras no se carga un GLB.
     const defecto = new THREE.Mesh(new THREE.TorusKnotGeometry(1, 0.35, 220, 36), this.material);
     this.grupo.add(defecto);
+    this.prepararRepresentaciones(this.grupo);
     escena.add(this.grupo);
 
     this.fondoPrevio = escena.background as THREE.Color | null;
@@ -122,23 +130,34 @@ export class CrossHatchSalon implements Salon {
     u.fondo.value.setHex(fondo);
     u.tinta.value.setHex(tinta);
     if (this.escena) this.escena.background = new THREE.Color(fondo);
+    const vista = p.vista === VISTA.Alambre ? VISTA.Alambre : p.vista === VISTA.Ambos ? VISTA.Ambos : VISTA.Caras;
+    for (const malla of this.caras) malla.visible = vista !== VISTA.Alambre;
+    for (const malla of this.alambres) malla.visible = vista !== VISTA.Caras;
     this.grupo.rotation.y += (p.giro ?? 0) * dt;
   }
 
   dispose(escena: THREE.Scene): void {
     escena.remove(this.grupo);
-    this.grupo.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+    this.liberarGeometrias();
     this.grupo.clear();
     this.material.dispose();
+    this.materialAlambre.dispose();
+    this.caras = [];
+    this.alambres = [];
     escena.background = this.fondoPrevio;
     this.escena = null;
   }
 
   // ————— El material (corazón del salón) —————
 
-  private crearMaterial(): THREE.MeshBasicNodeMaterial {
+  private crearMaterial(alambre = false): THREE.MeshBasicNodeMaterial {
     const u = this.u;
-    const mat = new THREE.MeshBasicNodeMaterial();
+    const mat = new THREE.MeshBasicNodeMaterial({
+      wireframe: alambre,
+      transparent: alambre,
+      opacity: alambre ? 0.65 : 1,
+      depthWrite: !alambre,
+    });
 
     mat.colorNode = Fn(() => {
       // Iluminación lambert con luz direccional propia (esférica → cartesiana)
@@ -209,9 +228,6 @@ export class CrossHatchSalon implements Salon {
   }
 
   private montarModelo(modelo: THREE.Object3D): void {
-    // Aplicar el material de trazo a todas las mallas del GLB
-    modelo.traverse((o) => { if (o instanceof THREE.Mesh) o.material = this.material; });
-
     // Centrar y normalizar tamaño (que cualquier modelo quepa igual en escena)
     const caja = new THREE.Box3().setFromObject(modelo);
     const centro = caja.getCenter(new THREE.Vector3());
@@ -219,9 +235,35 @@ export class CrossHatchSalon implements Salon {
     modelo.position.sub(centro);
     modelo.scale.setScalar(3.4 / dimension);
 
-    this.grupo.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+    this.liberarGeometrias();
     this.grupo.clear();
     this.grupo.add(modelo);
+    this.prepararRepresentaciones(modelo);
+  }
+
+  /** Las dos representaciones comparten geometría; solo se duplica el draw call. */
+  private prepararRepresentaciones(modelo: THREE.Object3D): void {
+    this.caras = [];
+    this.alambres = [];
+    const meshes: THREE.Mesh[] = [];
+    modelo.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
+    for (const malla of meshes) {
+      malla.material = this.material;
+      const alambre = new THREE.Mesh(malla.geometry, this.materialAlambre);
+      alambre.position.copy(malla.position);
+      alambre.rotation.copy(malla.rotation);
+      alambre.scale.copy(malla.scale);
+      alambre.frustumCulled = malla.frustumCulled;
+      malla.parent?.add(alambre);
+      this.caras.push(malla);
+      this.alambres.push(alambre);
+    }
+  }
+
+  private liberarGeometrias(): void {
+    const geometrias = new Set<THREE.BufferGeometry>();
+    this.grupo.traverse((o) => { if (o instanceof THREE.Mesh) geometrias.add(o.geometry); });
+    for (const geometria of geometrias) geometria.dispose();
   }
 
   // ————— Exportador —————

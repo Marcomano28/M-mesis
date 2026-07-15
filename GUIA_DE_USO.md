@@ -37,10 +37,10 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
 
 1. Elige salón en el selector.
 2. Mueve sliders. En salones con **pestañas** (p.ej. Clásica / SuperFlor), cada pestaña es una variante con sus propios parámetros.
-3. En Formas Exóticas, los controles comunes aplican a ambas variantes: **resolución** (densidad de la retícula), **exposición** (Puntos / Alambre / Caras) y **color**.
+3. La exposición es coherente entre salones: **Alambre**, **Caras** o **Ambos** superpone la malla y sus líneas. Formas Exóticas y Delaunay también ofrecen **Puntos**. Cada salón conserva su forma de colorear: color directo en Formas/Delaunay, fondo y tinta en Trazo, y tinte sobre paleta en Bajo Relieve.
 4. Salones con modelos: **📦 Cargar modelo GLB…** abre el selector de archivos — vale cualquier .glb/.gltf de cualquier carpeta, comprimido con Draco o no. En **Trazo y Grafito**, el GLB importado queda dentro de la ficha: al guardarla, recargarla o mandarla al Escenario reaparece el mismo modelo, no el nudo de muestra.
-   - Trazo y Grafito comienza sin giro. Sus controles **fondo**, **líneas** y **polaridad** permiten invertir el papel y el grafito de un gesto.
-   - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. **Profundidad base** determina cuánto volumen queda sin tocar; **intensidad relieve** controla la fuerza del bump bajo el ratón; y **radio del relieve** su tamaño. El salón auto-orienta el relieve (su eje delgado mira a cámara). Su GLB importado viaja dentro de la ficha y reaparece como el mismo actor al añadirlo al Escenario.
+   - Trazo y Grafito comienza sin giro. Sus controles **fondo**, **líneas**, **polaridad** y **exposición** permiten dirigir el papel, el grafito y su alambre de un gesto.
+   - En **Bajo Relieve**, el modelo entra casi plano: pásale el ratón por encima para que la estela lo revele. **Profundidad base** determina cuánto volumen queda sin tocar; **intensidad relieve** controla la fuerza del bump bajo el ratón; **radio del relieve** su tamaño; y **tinte** colorea la paleta. El salón auto-orienta el relieve (su eje delgado mira a cámara). Su GLB importado viaja dentro de la ficha y reaparece como el mismo actor al añadirlo al Escenario.
 5. Abre **🧵 Hilos de la ficha** antes de guardar:
    - **Esenciales** recupera una selección corta recomendada por el salón.
    - **Ninguno** permite empezar de cero.

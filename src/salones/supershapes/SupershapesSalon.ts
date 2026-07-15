@@ -22,7 +22,7 @@ import {
 import type { Salon, Params, ParamDef, Pestana, HiloFichaDef } from '../../core/Salon';
 
 const PI = Math.PI;
-const VISTA = { Puntos: 0, Alambre: 1, Caras: 2 };
+const VISTA = { Puntos: 0, Alambre: 1, Caras: 2, Ambos: 3 };
 const CARACOL = { Peludo: 0, Picos: 1, Moro: 2 };
 
 export class SupershapesSalon implements Salon {
@@ -39,7 +39,7 @@ export class SupershapesSalon implements Salon {
     { clave: 'escala',     etiqueta: 'escala',     valor: 2,    min: 0.2, max: 5 },
     { clave: 'giro',       etiqueta: 'giro',       valor: 0, min: -2,  max: 2 },
     { clave: 'resolucion', etiqueta: 'resolución', valor: 256,  min: 8,   max: 512, paso: 8 },
-    { clave: 'vista',      etiqueta: 'exposición', valor: 0,    min: 0,   max: 2, opciones: VISTA },
+    { clave: 'vista',      etiqueta: 'exposición', valor: 0,    min: 0,   max: 3, opciones: VISTA },
     { clave: 'color',      etiqueta: 'color',      valor: 0xdfe6ff, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'puntoTam',   etiqueta: 'tamaño punto (WebGL)', valor: 0.02, min: 0.001, max: 0.1 },
   ];
@@ -237,7 +237,7 @@ export class SupershapesSalon implements Salon {
   update(dt: number, _t: number, p: Params): void {
     // — Visibilidad: figura activa (pestaña) × modo de exposición —
     const modo = p.modo === 3 ? 3 : p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
-    const vista = p.vista === 1 ? 1 : p.vista === 2 ? 2 : 0;
+    const vista = p.vista === 3 ? 3 : p.vista === 2 ? 2 : p.vista === 1 ? 1 : 0;
 
     // — Retícula de Clásica/SuperFlor: solo se regenera si su resolución cambió.
     // Serpiente usa la misma resolución, pero con una topología propia.
@@ -250,8 +250,8 @@ export class SupershapesSalon implements Salon {
     const aplicar = (o: typeof this.objC, activa: boolean) => {
       if (!o) return;
       o.puntos.visible = activa && vista === VISTA.Puntos;
-      o.alambre.visible = activa && vista === VISTA.Alambre;
-      o.caras.visible = activa && vista === VISTA.Caras;
+      o.alambre.visible = activa && (vista === VISTA.Alambre || vista === VISTA.Ambos);
+      o.caras.visible = activa && (vista === VISTA.Caras || vista === VISTA.Ambos);
     };
     aplicar(this.objC, modo === 0);
     aplicar(this.objF, modo === 1);

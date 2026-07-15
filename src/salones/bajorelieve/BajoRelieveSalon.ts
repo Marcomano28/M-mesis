@@ -44,6 +44,7 @@ export class BajoRelieveSalon implements Salon {
     { clave: 'param.intensidad', etiqueta: 'intensidad del relieve', categoria: 'expresion', min: 0, max: 1, velocidad: 'gesto', coste: 'barato', afinidades: ['energia', 'ataque'], porDefecto: true, legado: true },
     { clave: 'param.radio', etiqueta: 'radio del relieve', categoria: 'expresion', min: 0.02, max: 0.35, velocidad: 'gesto', coste: 'medio', afinidades: ['energia'], legado: true },
     { clave: 'param.estela', etiqueta: 'memoria de estela', categoria: 'expresion', min: 0.002, max: 0.2, velocidad: 'frase', coste: 'medio', afinidades: ['textura'], legado: true },
+    { clave: 'param.color', etiqueta: 'tinte del relieve', categoria: 'material', min: 0, max: 0xffffff, velocidad: 'frase', coste: 'barato', afinidades: ['armonia', 'brillo'], porDefecto: true, legado: true },
     { clave: 'param.ciclo', etiqueta: 'ciclo de paleta', categoria: 'material', min: 0.5, max: 6, velocidad: 'frase', coste: 'barato', afinidades: ['armonia'], legado: true },
     { clave: 'param.tono', etiqueta: 'tono de paleta', categoria: 'material', min: -1, max: 1, velocidad: 'frase', coste: 'barato', afinidades: ['armonia', 'brillo'], porDefecto: true, legado: true },
     { clave: 'param.opacidad', etiqueta: 'opacidad de alambre', categoria: 'material', min: 0.05, max: 1, velocidad: 'gesto', coste: 'barato', afinidades: ['energia'], legado: true },
@@ -56,22 +57,24 @@ export class BajoRelieveSalon implements Salon {
 
   pestanas: Pestana[] = [
     {
-      titulo: 'Relieve',
+      titulo: 'Caras',
       params: [
         { clave: 'aplanado', etiqueta: 'profundidad base',      valor: 0.03, min: 0.005, max: 1 },
         { clave: 'intensidad', etiqueta: 'intensidad relieve', valor: 1,    min: 0,     max: 1 },
         { clave: 'radio',    etiqueta: 'radio del relieve',     valor: 0.1,  min: 0.02,  max: 0.35 },
         { clave: 'estela',   etiqueta: 'desvanecimiento', valor: 0.02,  min: 0.002, max: 0.2 },
+        { clave: 'color',    etiqueta: 'tinte',           valor: 0xffffff, min: 0, max: 0xffffff, tipo: 'color' },
         { clave: 'ciclo',    etiqueta: 'ciclo paleta',    valor: 2.883, min: 0.5,   max: 6 },
         { clave: 'tono',     etiqueta: 'tono paleta',     valor: 0,     min: -1,    max: 1 },
       ],
     },
     {
-      titulo: 'Wireframe',
+      titulo: 'Alambre',
       params: [
         { clave: 'opacidad', etiqueta: 'opacidad', valor: 0.6, min: 0.05, max: 1 },
       ],
     },
+    { titulo: 'Ambos', params: [] },
   ];
 
   acciones: Accion[] = [{ titulo: '📦 Cargar modelo GLB…', fn: () => this.cargarGLB() }];
@@ -79,6 +82,7 @@ export class BajoRelieveSalon implements Salon {
   private u = {
     aplanado: uniform(0.03),
     intensidad: uniform(1),
+    tinte: uniform(new THREE.Color(0xffffff)),
     ciclo: uniform(2.883),
     tono: uniform(0),
     opacidad: uniform(0.6),
@@ -87,9 +91,9 @@ export class BajoRelieveSalon implements Salon {
   private grupo = new THREE.Group();
   private estela!: Estela;
   private texturaEstela!: THREE.CanvasTexture;
-  private mallas: { malla: THREE.Mesh; relieve: THREE.NodeMaterial; alambre: THREE.NodeMaterial }[] = [];
+  private mallas: { malla: THREE.Mesh; alambreMalla: THREE.Mesh; relieve: THREE.NodeMaterial; alambre: THREE.NodeMaterial }[] = [];
   private puntero: { x: number; y: number } | null = null;
-  private modoActual = -1;
+  private vistaActual = -1;
   private fondoPrevio: THREE.Color | THREE.Texture | null = null;
   private quitarEventos: (() => void) | null = null;
   private modeloGuardado: ModeloGuardado | null;
@@ -132,14 +136,18 @@ export class BajoRelieveSalon implements Salon {
 
     this.u.aplanado.value = p.aplanado ?? 0.03;
     this.u.intensidad.value = p.intensidad ?? 1;
+    if (p.color !== undefined) this.u.tinte.value.setHex(p.color);
     this.u.ciclo.value = p.ciclo ?? 2.883;
     this.u.tono.value = p.tono ?? 0;
     this.u.opacidad.value = p.opacidad ?? 0.6;
 
-    const modo = p.modo ?? 0;
-    if (modo !== this.modoActual) {
-      this.modoActual = modo;
-      for (const m of this.mallas) m.malla.material = modo === 0 ? m.relieve : m.alambre;
+    const vista = p.modo === 2 ? 2 : p.modo === 1 ? 1 : 0;
+    if (vista !== this.vistaActual) {
+      this.vistaActual = vista;
+      for (const m of this.mallas) {
+        m.malla.visible = vista !== 1;
+        m.alambreMalla.visible = vista !== 0;
+      }
     }
 
     this.grupo.scale.setScalar(p.escala ?? 1);
@@ -159,7 +167,7 @@ export class BajoRelieveSalon implements Salon {
     this.grupo.clear();
     this.texturaEstela.dispose();
     escena.background = this.fondoPrevio;
-    this.modoActual = -1;
+    this.vistaActual = -1;
   }
 
   // ————— Materiales (corazón del salón) —————
@@ -170,7 +178,7 @@ export class BajoRelieveSalon implements Salon {
     const b = vec3(0.4, 0.29, 1.4);
     const c = vec3(0.18, 1.64, 0.8);
     const d = vec3(0.27, 1.35, 0.27);
-    return a.add(b.mul(cos(this.u.ciclo.mul(c.mul(float(t).add(this.u.tono)).add(d)))));
+    return a.add(b.mul(cos(this.u.ciclo.mul(c.mul(float(t).add(this.u.tono)).add(d))))).mul(this.u.tinte);
   }
 
   /**
@@ -281,8 +289,9 @@ export class BajoRelieveSalon implements Salon {
     const porDefecto = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1, THREE.RGBAFormat);
     porDefecto.needsUpdate = true;
 
-    modelo.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return;
+    const meshes: THREE.Mesh[] = [];
+    modelo.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
+    for (const o of meshes) {
       // Los GLB pueden traer material único o array: tomar el primero
       const matOriginal = (Array.isArray(o.material) ? o.material[0] : o.material) as THREE.MeshStandardMaterial;
       const tex1 = matOriginal?.map ?? porDefecto;
@@ -290,8 +299,15 @@ export class BajoRelieveSalon implements Salon {
       const relieve = this.crearMaterialRelieve(tex1, tex2);
       const alambre = this.crearMaterialAlambre();
       o.material = relieve;
-      this.mallas.push({ malla: o, relieve, alambre });
-    });
+      const alambreMalla = new THREE.Mesh(o.geometry, alambre);
+      alambreMalla.position.copy(o.position);
+      alambreMalla.rotation.copy(o.rotation);
+      alambreMalla.scale.copy(o.scale);
+      alambreMalla.visible = false;
+      alambreMalla.frustumCulled = o.frustumCulled;
+      o.parent?.add(alambreMalla);
+      this.mallas.push({ malla: o, alambreMalla, relieve, alambre });
+    }
 
     // Auto-orientar: el efecto aplasta el eje Z local, así que el eje MÁS
     // DELGADO del modelo (la profundidad del relieve) debe mirar a cámara.
@@ -313,7 +329,7 @@ export class BajoRelieveSalon implements Salon {
     modelo.position.copy(centro).multiplyScalar(-factor);
 
     this.grupo.add(modelo);
-    this.modoActual = -1; // fuerza reasignación de material según pestaña activa
+    this.vistaActual = -1; // fuerza aplicación de caras / alambre / ambos
   }
 
   // ————— Exportador —————
