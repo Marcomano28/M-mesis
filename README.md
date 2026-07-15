@@ -82,7 +82,7 @@ npm run build      # typecheck (tsc) + build de producción a dist/
 npm run preview    # sirve el build de producción
 ```
 
-En la consola del navegador (F12), `window.MIA` expone `engine`, `bus`, `galeria` y `motorLFO` para inspección. Si algo falla, un banner rojo al pie muestra el error.
+En la consola del navegador (F12), `window.MIA` expone `engine`, `bus`, `galeria`, `transporte` y los motores de actuación para inspección. Si algo falla, un banner rojo al pie muestra el error.
 
 ---
 
@@ -108,8 +108,8 @@ Los pasos completos, con atajos y trucos, están en **[GUIA_DE_USO.md](GUIA_DE_U
 
 ```
 src/
-  core/      Engine (WebGPU), ParamBus, contrato Salon, Fichas (IndexedDB),
-             Moduladores (LFOs), CargadorGLB (Draco local)
+  core/      Engine (WebGPU), ParamBus, Transporte, contrato Salon,
+             Fichas (IndexedDB), Moduladores (LFOs), CargadorGLB
   salones/   supershapes/ · crosshatch/ · bajorelieve/ · delaunay/ · escenario/
   shell/     Galeria, Paneles, Cajonera, PanelModuladores, panel de errores
   main.ts    punto de entrada: motor + bus + registro de salones
@@ -124,7 +124,7 @@ Añadir un salón nuevo es crear su clase (implementando el contrato `Salon`) y 
 
 ## Estado
 
-El ciclo del taller, la selección de hilos por ficha y su persistencia en DocumentoEscena v3 están funcionando. El siguiente hito es crear un transporte musical común; después vendrán la capa de gestos, el registro de performance y la captura de audio/vídeo. El destino y sus criterios técnicos están en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.
+El ciclo del taller, la selección de hilos por ficha, DocumentoEscena v3 y el transporte musical común están funcionando. El siguiente hito es registrar eventos de la interpretación con timestamps y reproducirlos sin micrófono; después vendrán cámara de obra y captura de audio/vídeo. El destino y sus criterios técnicos están en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.
 
 ---
 

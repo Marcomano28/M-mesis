@@ -1,7 +1,7 @@
 # MIA — Ruta al videoclip interpretado
 ### De una escena reactiva a una toma audiovisual única, reproducible y masterizable
 
-*Versión 1.2 · 15 de julio de 2026 · documento técnico de destino*
+*Versión 1.3 · 15 de julio de 2026 · documento técnico de destino*
 
 Este documento responde una pregunta concreta: **¿puede MIA producir un videoclip musical a partir de una improvisación en tiempo real?**
 
@@ -48,13 +48,13 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 | Acumuladores de frase | ✅ | Primer nivel de memoria temporal |
 | Mesa de Sinestesia | ✅ MVP | Curva, rango, ataque y caída por ruta |
 | Export HTML de escena | 🟡 | Reproduce Formas Exóticas y Trazo/GLB; no es aún el runtime completo |
-| Transporte musical | ⬜ | Falta reloj maestro, play/stop, compás y posición |
+| Transporte musical | ✅ MVP | Reloj común, play/stop, posición, BPM, métrica, duración, bucle y persistencia por escena |
 | Persistencia de rutas | ✅ MVP | Rutas, LFOs y acumuladores viajan con la ficha; los valores vivos se reinician |
 | Cámara/luz direccionables | ⬜ | Falta lenguaje cinematográfico |
 | Grabación de performance | ⬜ | Falta registrar audio, rasgos, cues y decisiones |
 | Captura audiovisual | ⬜ | Falta grabador, sincronía, codecs y control de carga |
 
-Conclusión: **la marioneta ya tiene hilos; ahora hay que escribir la partitura, construir el reloj y filmar la función.**
+Conclusión: **la marioneta ya tiene hilos y reloj; ahora hay que registrar la interpretación, escribir pistas y filmar la función.**
 
 ---
 
@@ -98,7 +98,7 @@ Regla esencial: **el audio es el reloj**, no `requestAnimationFrame`. La imagen 
 
 ## 4. Contratos de código que faltan
 
-Los nombres siguientes son una propuesta de arquitectura, no código implementado todavía.
+Los nombres siguientes describen el contrato de destino. `ConfiguracionTransporte` y el reloj base ya existen; performance, captura y el resto de direcciones todavía son propuesta.
 
 ```ts
 type DireccionHilo =
@@ -188,17 +188,18 @@ interface TomaPerformance {
 
 **Criterio alcanzado:** guardar una escena, vaciar los motores y recuperar actor, ruta de audio, LFO y acumulador con las mismas fuentes y destinos.
 
-### P2 — Transporte musical y reloj único
+### P2 — Transporte musical y reloj único ✅ MVP
 
 **Objetivo:** que todo componente comparta posición, duración y estado de interpretación.
 
-- Crear `core/Transporte.ts`: `parado | preparado | grabando | reproduciendo`.
-- Usar `AudioContext.currentTime` como tiempo maestro durante una toma.
-- Exponer `tiempo`, `delta`, `compas`, `beat`, `bpm` y cues.
-- Hacer que LFO, acumuladores, timeline y Escenario reciban tiempo musical.
-- Añadir cuenta atrás, inicio limpio y finalización segura.
+- Creado `core/Transporte.ts`: `parado | preparado | reproduciendo`.
+- `AudioContext.currentTime` gobierna la reproducción; un reloj monotónico mantiene continuidad mientras el navegador habilita el audio.
+- Expuestos `tiempo`, `delta`, `compas`, `pulso`, `beat`, `fasePulso` y `bpm`.
+- LFO, acumuladores, sinestesia y Escenario reciben el mismo marco musical; los camerinos mantienen su tiempo de diseño independiente.
+- BPM, métrica, duración y bucle viajan en DocumentoEscena v3 y restauran la obra detenida a cero.
+- Pendiente para P6/P8: estado `grabando`, cues, cuenta atrás, finalización de toma y prueba prolongada de deriva.
 
-**Criterio:** después de cinco minutos, un cue de audio y uno visual mantienen una deriva imperceptible; los frames perdidos no desplazan la obra.
+**Criterio MVP alcanzado:** play/stop y persistencia exacta verificados; los frames visuales consultan un tiempo absoluto. **Criterio de producción pendiente:** medir cinco minutos con cues audiovisuales y deriva imperceptible.
 
 ### Contrato ya preparado para el oído musical
 
@@ -367,9 +368,9 @@ Este MVP ya sería una obra: no una demostración de tecnología, sino una inter
 
 ## 9. Orden inmediato recomendado
 
-El orden que reduce más riesgos, una vez completado DocumentoEscena v3, es:
+El orden que reduce más riesgos, con DocumentoEscena v3 y el transporte mínimo completados, es:
 
-1. **Transporte mínimo**: preparar/play/stop y reloj de audio compartido.
+1. ✅ **Transporte mínimo**: preparar/play/stop y reloj de audio compartido.
 2. **Registro de performance**: eventos con timestamps y replay sin micrófono.
 3. **Cámara de obra direccionable**.
 4. **Grabación directa** con `captureStream` + `MediaRecorder`.

@@ -109,17 +109,24 @@ export class Galeria {
       salon.nombre,
     );
     if (!nombre) return;
+    // Congelar la ficha antes de esperar por la captura GPU. Así la miniatura
+    // puede tardar varios frames sin que una edición posterior cambie la
+    // partitura, los hilos o los parámetros que el usuario decidió guardar.
+    const params = this.bus.baseDeSalon(salon.id);
+    const hilos = salon.hilosFicha ? materializarHilos(
+      catalogoHilosFicha(salon).filter((hilo) => this.obtenerSeleccion(salon).has(hilo.clave)),
+    ) : undefined;
+    const extra = salon.estadoExtra?.();
+    const miniatura = await this.engine.capturar();
     const ficha: Ficha = {
       id: crypto.randomUUID(),
       nombre,
       salonId: salon.id,
-      params: this.bus.baseDeSalon(salon.id), // la base, sin oscilación de LFOs
-      miniatura: await this.engine.capturar(),
+      params, // la base, sin oscilación de LFOs
+      miniatura,
       fecha: Date.now(),
-      hilos: salon.hilosFicha ? materializarHilos(
-        catalogoHilosFicha(salon).filter((hilo) => this.obtenerSeleccion(salon).has(hilo.clave)),
-      ) : undefined,
-      extra: salon.estadoExtra?.(),
+      hilos,
+      extra,
     };
     await this.almacen.guardar(ficha);
     await this.refrescarCajonera();

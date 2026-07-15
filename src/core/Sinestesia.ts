@@ -3,6 +3,7 @@
 // MVP: fuentes musicales reales (MIDI/audio) + fuentes tocables de respaldo.
 
 import type { ParamBus } from './ParamBus';
+import type { Transporte } from './Transporte';
 import { onda } from './Moduladores';
 
 export type FuenteSinestesia =
@@ -52,7 +53,7 @@ export class MotorSinestesia {
   private nivelAudioPrevio = 0;
   private escuchasCambio = new Set<() => void>();
 
-  constructor(private bus: ParamBus) {
+  constructor(private bus: ParamBus, private transporte?: Transporte) {
     window.addEventListener('pointermove', (ev) => {
       this.fuentes.ratonX = clamp01(ev.clientX / Math.max(1, window.innerWidth));
       this.fuentes.ratonY = clamp01(1 - ev.clientY / Math.max(1, window.innerHeight));
@@ -75,7 +76,9 @@ export class MotorSinestesia {
         autoGainControl: false,
       },
     });
-    this.audioCtx = new AudioContext();
+    this.audioCtx = this.transporte
+      ? await this.transporte.obtenerContextoAudio()
+      : new AudioContext({ latencyHint: 'interactive' });
     const fuente = this.audioCtx.createMediaStreamSource(stream);
     this.analizador = this.audioCtx.createAnalyser();
     this.analizador.fftSize = 1024;
@@ -168,8 +171,8 @@ export class MotorSinestesia {
     for (const fn of this.escuchasCambio) fn();
   }
 
-  tick(dt: number, tiempo: number): void {
-    this.fuentes.pulso = onda('seno', tiempo * 0.25) * 0.5 + 0.5;
+  tick(dt: number, tiempo: number, bpm = 60): void {
+    this.fuentes.pulso = onda('seno', tiempo * bpm / 60) * 0.5 + 0.5;
     this.actualizarAudio();
 
     for (const r of this.rutas) {

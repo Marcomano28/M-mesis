@@ -17,6 +17,8 @@ import { CrossHatchSalon } from './salones/crosshatch/CrossHatchSalon';
 import { BajoRelieveSalon } from './salones/bajorelieve/BajoRelieveSalon';
 import { DelaunaySalon } from './salones/delaunay/DelaunaySalon';
 import { EscenarioSalon } from './salones/escenario/EscenarioSalon';
+import { Transporte } from './core/Transporte';
+import { PanelTransporte } from './shell/PanelTransporte';
 
 const bus = new ParamBus();
 const engine = new Engine(document.getElementById('lienzo')!);
@@ -33,15 +35,17 @@ const fabricas = {
   delaunay: () => new DelaunaySalon(),
 };
 
-// Los motores existen antes que el Escenario para que DocumentoEscena v3
+// El transporte y los motores existen antes que el Escenario para que DocumentoEscena v3
 // pueda guardar y restaurar la manera de tocar cada actor.
+const transporte = new Transporte();
 const motorLFO = new MotorLFO(bus);
 const motorAcum = new MotorAcumuladores(bus);
-const motorSinestesia = new MotorSinestesia(bus);
+const motorSinestesia = new MotorSinestesia(bus, transporte);
 const escenario = new EscenarioSalon(fabricas, bus, {
   sinestesia: motorSinestesia,
   lfo: motorLFO,
   acumuladores: motorAcum,
+  transporte,
 });
 
 const galeria = new Galeria(
@@ -53,6 +57,7 @@ galeria.onCambioDestinos(() => {
   motorSinestesia.refrescarDestinos();
   motorLFO.refrescarDestinos();
 });
+const panelTransporte = new PanelTransporte(transporte);
 
 // Fuentes vivas: LFOs (oscilan) y Acumuladores (recuerdan — Etapa 1 del templo)
 new PanelModuladores(motorLFO, motorAcum, () => galeria.destinosModulables());
@@ -68,17 +73,26 @@ addEventListener('pointermove', (e) => {
 new PanelSinestesia(motorSinestesia, () => galeria.destinosModulables());
 
 // Acceso de depuración desde la consola
-(window as unknown as Record<string, unknown>).MIA = { engine, bus, galeria, motorLFO, motorAcum, motorSinestesia };
+(window as unknown as Record<string, unknown>).MIA = {
+  engine, bus, galeria, transporte, motorLFO, motorAcum, motorSinestesia,
+};
 
 let errorLoop = false;
 engine.arrancar((dt, tiempo) => {
+  const marco = transporte.tick();
+  panelTransporte.actualizar();
   const salon = galeria.salonActivo;
   if (!salon) return;
   try {
-    motorLFO.tick(tiempo); // los moduladores respiran antes de que el salón lea
-    motorAcum.tick(dt, tiempo); // la memoria digiere la actividad (Etapa 1)
-    motorSinestesia.tick(dt, tiempo); // la mesa de sinestesia escribe en el mismo plano
-    salon.update(dt, tiempo, bus.deSalon(salon.id));
+    // Los camerinos conservan el reloj libre de modelado. Solo el Escenario
+    // obedece play/stop y el reloj musical común.
+    const enEscenario = salon.id === 'escenario';
+    const deltaObra = enEscenario ? marco.delta : dt;
+    const tiempoObra = enEscenario ? marco.tiempo : tiempo;
+    motorLFO.tick(tiempoObra);
+    motorAcum.tick(deltaObra, tiempoObra);
+    motorSinestesia.tick(deltaObra, tiempoObra, enEscenario ? marco.bpm : 15);
+    salon.update(deltaObra, tiempoObra, bus.deSalon(salon.id));
     errorLoop = false;
   } catch (err) {
     if (!errorLoop) {

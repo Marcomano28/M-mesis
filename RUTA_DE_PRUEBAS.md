@@ -9,7 +9,7 @@
 
 ---
 
-## Punto de control actual — Escenario v3
+## Punto de control actual — Escenario v3 + Transporte musical
 
 Sí, **es momento de probar**. La ronda actual no pretende validar todavía la ópera completa: valida que el reparto y el escenario sean suficientemente sólidos para recibir cámara, luces y timeline.
 
@@ -45,6 +45,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P13 | 🟡 | Dos marionetas con micrófono | `audio ataque → escala Y` de una y `audio nivel → rotación Z` de otra; la escena global debe quedar quieta |
 | P14 | ✅ | Persistencia de la coreografía | Una ficha restauró actor, ruta `audio ataque → rotación Y`, LFO `→ rotación X` y acumulador `rotación X → escala Z`; quitar el actor limpió los tres motores |
 | P15 | ✅ | Hilos seleccionados por ficha | Una ficha `🧵 1` ofreció en la Mesa únicamente `Actor un hilo · rotación Y`; la escena guardada conservó actor, selección y ruta |
+| P16 | ✅ | Transporte musical compartido | `preparado → reproduciendo → preparado`, avance 00:00→00:01.5 y compás 1·4 a 120 BPM; stop volvió a cero. Una escena restauró 90 BPM, 3 pulsos, 12 s y bucle apagado después de alterarlos |
 
 **Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
@@ -55,7 +56,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | ⬜ | Cámara de obra animada | Solo existe cámara de inspección y persistencia inicial |
 | ⬜ | Luces como actores escénicos | El documento reserva el campo, no hay editor/runtime |
 | ⬜ | Timeline y keyframes | Las pistas están tipadas, pero aún no se evalúan |
-| ⬜ | Música como reloj maestro | La sinestesia reacciona, pero no existe transporte musical |
+| ✅ MVP | Música como reloj maestro | Transporte común con AudioContext, respaldo monotónico, play/stop, posición, BPM, compás, duración y bucle |
 | ✅ | Modulación individual por actor | Pose y expresiones seguras ya usan direcciones estables por ID |
 | ⬜ | Vestuario por actor | Concepto definido; contrato todavía pendiente |
 
@@ -69,6 +70,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | 15-07-2026 | `main` | Hilos de pose y expresión por actor conectados a LFO, memoria y sinestesia | P12 ✅ · P13 🟡 para prueba visual con micrófono |
 | 15-07-2026 | `main` | DocumentoEscena v3: rutas, LFOs y acumuladores persistentes; limpieza de huérfanos | P14 ✅ en navegador integrado · TypeScript/build ✅ |
 | 15-07-2026 | `main` | Catálogo seguro y selección de hilos exportada con cada ficha | P15 ✅ · selector programático de salón sincronizado · TypeScript/build ✅ |
+| 15-07-2026 | `main` | Transporte común de escena, persistencia y captura atómica de fichas | P16 ✅ en navegador integrado · TypeScript/build ✅ |
 
 ---
 
@@ -130,11 +132,12 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E13 | Quitar un actor usado por los tres motores | Sus rutas, LFOs y acumuladores desaparecen y no dejan modulación residual |
 | E14 | Seleccionar un único hilo, guardar ficha y añadirla al Escenario | La cajonera muestra `🧵 1`; la Mesa ofrece solo ese destino para el actor |
 | E15 | Guardar y restaurar una escena con la ficha filtrada | La selección de hilos y las rutas sobreviven dentro de DocumentoEscena v3 |
+| E16 | Preparar/reproducir/detener y restaurar una escena con otro tempo | El reloj avanza por tiempo musical, vuelve a cero y recupera BPM, métrica, duración y bucle |
 
 ## Cierre
 
 - Hallazgos → se arreglan en el momento o se anotan aquí con ❌ y ticket en el plan.
-- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3**. El siguiente bloque de construcción es el transporte musical mínimo.
+- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3** y P16 cierra el transporte mínimo. El siguiente bloque es registrar eventos con timestamps y reproducirlos sin micrófono.
 - Después de cada sesión se actualizan estados y se añade una fila al **Registro de rondas**.
 
 ---

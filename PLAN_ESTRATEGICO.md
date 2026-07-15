@@ -1,7 +1,7 @@
 # MIA — Plan Estratégico
 ### El Taller: modelar · coleccionar · componer · (tocar)
 
-*Versión 2.2 — Julio 2026 · sustituye a la v1.0 ("Galería viva")*
+*Versión 2.3 — Julio 2026 · sustituye a la v1.0 ("Galería viva")*
 *Ruta de acciones del taller: ver **GUIA_DE_USO.md***
 *Fundamento conceptual y plano del templo: ver **BIBLIA_CONCEPTUAL.md** (este plan ejecuta; la biblia orienta)*
 *Camino técnico hasta una obra grabada: ver **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)***
@@ -53,10 +53,11 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 | **Moduladores (LFOs)** | ✅ | Base + Σ desplazamientos con clamp; cinco ondas y destinos de salón/actor |
 | **Mesa de Sinestesia** | ✅ MVP | Micrófono, MIDI, ratón y pulso → destino con rango, curva, ataque y caída; las rutas viajan con la escena; falta matriz de grupos |
 | **Coreografía persistente** | ✅ MVP | DocumentoEscena v3 guarda/restaura rutas, LFOs y acumuladores y limpia referencias al quitar actores |
+| **Transporte musical** | ✅ MVP | Reloj compartido, BPM, métrica, duración, bucle y posición; la configuración viaja con la escena |
 | Cargador GLB compartido | ✅ | Draco local; Trazo guarda el binario en ficha y lo transporta al Escenario/export |
 | Exportador «Imprimir» por salón | ✅ v1 | HTML autocontenido vía CDN con valores horneados |
 | Panel de errores en pantalla | ✅ | Excepciones, promesas y console.error visibles; el loop sobrevive a fallos de un salón |
-| Depuración | ✅ | `window.MIA` (engine, bus, galeria) expuesto en consola |
+| Depuración | ✅ | `window.MIA` (engine, bus, galeria, transporte y motores) expuesto en consola |
 
 **Rendimiento**: las figuras paramétricas se evalúan en GPU — mover un slider solo escribe un uniform (cero regeneración). Solo el cambio de *resolución* reconstruye la retícula. Techo actual holgado; el siguiente salto sería compute shaders para nubes masivas.
 
@@ -80,6 +81,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 │  (el Escenario instancia salones como actores)             │
 ├────────────────────────────────────────────────────────────┤
 │  FUENTES    sliders · fichas · LFOs · audio/MIDI · memoria │
+│             transporte musical común                       │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -214,7 +216,7 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 
 ## 6. Riesgos y decisiones abiertas
 
-- **Reloj y sincronía**: audio, render, timeline y captura no pueden avanzar con relojes independientes. El tiempo de Web Audio será la referencia.
+- **Reloj y sincronía**: el MVP ya comparte tiempo de Web Audio —con respaldo monotónico— entre actuación y Escenario. Timeline, registro y captura deben conectarse al mismo contrato, no crear relojes nuevos.
 - **Exportador del Escenario**: las plantillas parciales divergen del editor. Debe extraerse un runtime único usado por editor, replay, HTML y render.
 - **Fichas y assets**: Trazo ya guarda GLB; falta deduplicación por hash y aplicar el mismo contrato a Bajo Relieve.
 - **Captura**: la toma directa preserva la espontaneidad pero también los frames perdidos. Se combinará con replay determinista para master.

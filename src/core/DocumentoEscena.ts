@@ -8,6 +8,7 @@ import type { FichaParaSalon } from './Salon';
 import type { RutaSinestesiaGuardada } from './Sinestesia';
 import type { LFO } from './Moduladores';
 import type { AcumuladorGuardado } from './Acumuladores';
+import { crearConfiguracionTransporte, type ConfiguracionTransporte } from './Transporte';
 
 export type ActividadActor = 'estatico' | 'dinamico';
 
@@ -55,6 +56,7 @@ export interface DocumentoEscena {
   version: 3;
   duracion: number;
   bucle: boolean;
+  transporte: ConfiguracionTransporte;
   actores: ActorEscena[];
   camara: CamaraEscena;
   luces: unknown[];
@@ -62,7 +64,7 @@ export interface DocumentoEscena {
   actuacion: ActuacionEscena;
 }
 
-interface DocumentoV2 extends Omit<DocumentoEscena, 'version' | 'actuacion'> {
+interface DocumentoV2 extends Omit<DocumentoEscena, 'version' | 'actuacion' | 'transporte'> {
   version: 2;
 }
 
@@ -105,10 +107,12 @@ function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
 }
 
 export function crearDocumentoEscena(): DocumentoEscena {
+  const transporte = crearConfiguracionTransporte();
   return {
     version: 3,
-    duracion: 60,
-    bucle: true,
+    duracion: transporte.duracion,
+    bucle: transporte.bucle,
+    transporte,
     actores: [],
     camara: { posicion: [0, 0, 6], objetivo: [0, 0, 0], fov: 50 },
     luces: [],
@@ -125,10 +129,22 @@ export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
 
   if (datos.version === 3 || datos.version === 2) {
     const d = datos as DocumentoEscena | DocumentoV2;
+    const guardado = d.version === 3
+      ? (d as Partial<DocumentoEscena>).transporte
+      : undefined;
+    const transporte = {
+      ...crearConfiguracionTransporte(),
+      ...(guardado ?? {}),
+      duracion: d.duracion ?? guardado?.duracion ?? 60,
+      bucle: d.bucle ?? guardado?.bucle ?? true,
+    };
     return {
       ...crearDocumentoEscena(),
       ...d,
       version: 3,
+      duracion: transporte.duracion,
+      bucle: transporte.bucle,
+      transporte,
       camara: { ...crearDocumentoEscena().camara, ...d.camara },
       actores: d.actores.map((a) => ({
         ...a,

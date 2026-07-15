@@ -17,6 +17,7 @@ import type { ParamBus } from '../../core/ParamBus';
 import type { MotorSinestesia } from '../../core/Sinestesia';
 import type { MotorLFO } from '../../core/Moduladores';
 import type { MotorAcumuladores } from '../../core/Acumuladores';
+import type { Transporte } from '../../core/Transporte';
 import {
   crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
   type ActorEscena, type DocumentoEscena,
@@ -35,6 +36,7 @@ interface MotoresActuacion {
   sinestesia: MotorSinestesia;
   lfo: MotorLFO;
   acumuladores: MotorAcumuladores;
+  transporte: Transporte;
 }
 
 const TRANSFORM_HILOS = [
@@ -324,6 +326,10 @@ export class EscenarioSalon implements Salon {
 
   /** La partitura de la escena viaja dentro de la ficha (campo extra). */
   estadoExtra(): unknown {
+    const transporte = this.motores.transporte.exportarConfiguracion();
+    this.documento.duracion = transporte.duracion;
+    this.documento.bucle = transporte.bucle;
+    this.documento.transporte = transporte;
     this.documento.camara = {
       posicion: this.camara.position.toArray() as [number, number, number],
       objetivo: [...this.documento.camara.objetivo],
@@ -345,6 +351,8 @@ export class EscenarioSalon implements Salon {
     for (const v of this.vivos) this.desmontar(v);
     this.vivos = [];
     this.documento = documento;
+    this.motores.transporte.configurar(documento.transporte);
+    this.motores.transporte.detener();
     this.motores.sinestesia.restaurar(documento.actuacion.rutas);
     this.motores.lfo.restaurar(documento.actuacion.lfos);
     this.motores.acumuladores.restaurar(documento.actuacion.acumuladores);
