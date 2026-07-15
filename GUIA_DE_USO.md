@@ -3,7 +3,7 @@
 
 *Documento vivo · actualizado el 15 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md*
 
-**Estado actual:** camerinos, fichas y **Escenario v2** utilizables. Los actores ya tienen identidad, visibilidad, transform completo, duplicación y modo estático/dinámico. La cámara de obra, luces escénicas, vestuario por actor y timeline musical todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
+**Estado actual:** camerinos, fichas y **Escenario v2** utilizables. Los actores ya tienen identidad, visibilidad, transform completo, duplicación, modo estático/dinámico y **hilos individuales** para las fuentes vivas. La cámara de obra, luces escénicas, vestuario por actor y timeline musical todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
 
 ---
 
@@ -73,11 +73,20 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria` y `motorLFO
 
 ## 5. Animar (los moduladores)
 
-> **Alcance actual:** los moduladores actúan sobre el salón activo y sobre el giro global del Escenario. El ruteo individual hacia `actor:<id>`, cámara y luces llegará con el motor de guion; aún no debe considerarse implementado.
+> **Alcance actual:** estando en el Escenario, las fuentes vivas pueden actuar sobre la escena completa o sobre los hilos de cada actor. Cámara, luces y reproducción de una partitura temporal siguen pendientes.
 
 1. Activa el salón (o el Escenario) cuyo parámetro quieras mover.
 2. **〰 Moduladores → ➕ Añadir LFO**: el desplegable *destino* ofrece los sliders del salón activo en ese momento.
 3. Controles por LFO: **activo** (on/off), **destino**, **forma** (seno, triángulo, sierra, cuadrada, ruido suave), **frecuencia (Hz)**, **amplitud**, **fase**.
+
+### Marionetas en el Escenario
+
+1. Añade una ficha al Escenario y abre **◇ Mesa de Sinestesia**.
+2. Pulsa **➕ Añadir ruta**. En *destino* aparecerán, por nombre de actor, posición XYZ, rotación XYZ, escala XYZ y sus expresiones internas seguras.
+3. Elige, por ejemplo, `audio ataque → Aria · escala Y` y crea otra ruta `audio nivel → Coro · rotación Z`.
+4. Las transformaciones responden incluso si el actor está en **estático (ahorra)**. Las expresiones internas solo responden en **dinámico**.
+
+Los controles que regeneran topología —resolución, número de puntos, semilla o triangulación— no se ofrecen como hilos musicales. Evita que cada muestra de audio reconstruya geometría y mantiene estable el frame.
 
 Reglas de la casa:
 - El slider define la **base**; el LFO **suma** encima. Puedes seguir moviendo el slider con el LFO sonando.
@@ -118,6 +127,7 @@ Y la promesa del Acto II: donde hoy dice 〰 LFO, mañana dirá 🎸 guitarra �
 - **GLB "invisible" en Bajo Relieve**: sube el slider *aplanado base* para ver el modelo completo sin estela.
 - **La miniatura no refleja lo que ves**: la captura toma el frame actual — encuadra antes de ☆.
 - **Reset rápido de fichas**: borra la base de datos `mia-fichas` en DevTools → Application → IndexedDB.
+- **Rutas de sinestesia**: los hilos individuales funcionan en vivo, pero las rutas todavía no se guardan dentro de la ficha de Escenario ni se exportan al HTML.
 - **Cámara actual**: OrbitControls sigue siendo cámara de inspección. Su posición y FOV se guardan en el DocumentoEscena v2, pero todavía no existe una cámara de obra independiente ni pistas de cámara.
 - **Luces, vestuario y timeline**: aparecen ya reservados en el documento de escena, pero todavía no tienen herramientas de edición. No deben incluirse como fallos en la ronda actual.
 

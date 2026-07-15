@@ -20,6 +20,14 @@ export interface ParamDef {
 /** Valores actuales de los parámetros de un salón, por clave. */
 export type Params = Record<string, number>;
 
+/** Dirección que una fuente viva puede accionar como un hilo de marioneta. */
+export interface HiloModulable {
+  etiqueta: string;
+  dir: string;
+  min: number;
+  max: number;
+}
+
 /** Acción no-numérica del salón (p.ej. «Cargar modelo GLB»). Se vuelve botón en el panel. */
 export interface Accion {
   titulo: string;
@@ -70,4 +78,7 @@ export interface Salon {
 
   /** Restaura el estado extra de una ficha cargada. */
   cargarEstadoExtra?(extra: unknown): void;
+
+  /** Destinos adicionales creados en runtime (p.ej. hilos de cada actor). */
+  hilosModulables?(): HiloModulable[];
 }

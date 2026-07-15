@@ -2,7 +2,7 @@
 // Al cambiar de salón: dispose del anterior, init del nuevo, panel regenerado.
 
 import { Pane } from 'tweakpane';
-import type { Salon } from '../core/Salon';
+import type { Salon, HiloModulable } from '../core/Salon';
 import type { ParamBus } from '../core/ParamBus';
 import type { Engine } from '../core/Engine';
 import { AlmacenFichas, type Ficha } from '../core/Fichas';
@@ -43,11 +43,11 @@ export class Galeria {
   }
 
   /** Parámetros modulables del salón activo (para los LFOs): solo sliders numéricos. */
-  destinosModulables(): { etiqueta: string; dir: string; min: number; max: number }[] {
+  destinosModulables(): HiloModulable[] {
     const salon = this.activo;
     if (!salon) return [];
     const defs = [...salon.params, ...(salon.pestanas ?? []).flatMap((p) => p.params)];
-    return defs
+    const propios = defs
       .filter((d) => d.tipo !== 'color' && !d.opciones)
       .map((d) => ({
         etiqueta: `${salon.nombre} · ${d.etiqueta}`,
@@ -55,6 +55,7 @@ export class Galeria {
         min: d.min,
         max: d.max,
       }));
+    return [...propios, ...(salon.hilosModulables?.() ?? [])];
   }
 
   activar(id: string): void {

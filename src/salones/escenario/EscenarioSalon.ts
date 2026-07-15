@@ -9,7 +9,8 @@
 
 import { Pane } from 'tweakpane';
 import * as THREE from 'three/webgpu';
-import type { Salon, Params, ParamDef, FichaParaSalon } from '../../core/Salon';
+import type { Salon, Params, ParamDef, FichaParaSalon, HiloModulable } from '../../core/Salon';
+import type { ParamBus } from '../../core/ParamBus';
 import {
   crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
   type ActorEscena, type DocumentoEscena,
@@ -20,8 +21,30 @@ interface ActorVivo {
   salon: Salon;
   envoltura: THREE.Group;
   folder: { dispose(): void };
-  transformSucio: boolean;
+  /** Objeto estable: se actualiza en sitio para no generar basura cada frame. */
+  paramsActuales: Params;
 }
+
+const TRANSFORM_HILOS = [
+  { clave: 'x', etiqueta: 'posición X', min: -8, max: 8 },
+  { clave: 'y', etiqueta: 'posición Y', min: -8, max: 8 },
+  { clave: 'z', etiqueta: 'posición Z', min: -8, max: 8 },
+  { clave: 'rotX', etiqueta: 'rotación X', min: -Math.PI, max: Math.PI },
+  { clave: 'rotY', etiqueta: 'rotación Y', min: -Math.PI, max: Math.PI },
+  { clave: 'rotZ', etiqueta: 'rotación Z', min: -Math.PI, max: Math.PI },
+  { clave: 'escalaX', etiqueta: 'escala X', min: 0.05, max: 4 },
+  { clave: 'escalaY', etiqueta: 'escala Y', min: 0.05, max: 4 },
+  { clave: 'escalaZ', etiqueta: 'escala Z', min: 0.05, max: 4 },
+] as const;
+
+// Parámetros que solo cambian uniforms o transforms. Se excluyen resolución,
+// triangulación y demás topología para que el audio no regenere geometría 60 veces/s.
+const EXPRESIONES_SEGURAS = new Set([
+  'escala', 'giro', 'puntoTam',
+  'grosor', 'angulo', 'temblor', 'grano', 'intensidad', 'luzAzimut', 'luzAltura',
+  'aplanado', 'radio', 'estela', 'ciclo', 'tono', 'opacidad',
+  'velGiro', 'sepZ', 'ampDeg',
+]);
 
 export class EscenarioSalon implements Salon {
   id = 'escenario';
@@ -42,7 +65,10 @@ export class EscenarioSalon implements Salon {
   private generacionMontaje = 0;
 
   /** fábricas: salonId → instancia ligera preparada para la receta del actor. */
-  constructor(private fabricas: Record<string, (ficha: FichaParaSalon) => Salon>) {}
+  constructor(
+    private fabricas: Record<string, (ficha: FichaParaSalon) => Salon>,
+    private bus: ParamBus,
+  ) {}
 
   init(escena: THREE.Scene, camara: THREE.PerspectiveCamera): void {
     this.escena = escena;
@@ -94,30 +120,33 @@ export class EscenarioSalon implements Salon {
 
       const folder = (this.pane as Pane).addFolder({ title: def.ficha.nombre, expanded: false });
       const t = def.transform;
-      const vivo: ActorVivo = { def, salon, envoltura, folder, transformSucio: true };
-      const sucio = () => { vivo.transformSucio = true; };
+      const vivo: ActorVivo = { def, salon, envoltura, folder, paramsActuales: { ...def.ficha.params } };
+      this.registrarHilos(vivo);
+      const cambioTransform = (clave: typeof TRANSFORM_HILOS[number]['clave']) => () => {
+        this.bus.set(this.dirTransform(def.id, clave), t[clave]);
+      };
       folder.addBinding(def.ficha, 'nombre', { label: 'nombre' });
-      folder.addBinding(def, 'visible', { label: 'en escena' }).on('change', sucio);
+      folder.addBinding(def, 'visible', { label: 'en escena' });
       folder.addBinding(def, 'actividad', {
         label: 'actuación',
         options: { 'estático (ahorra)': 'estatico', 'dinámico': 'dinamico' },
       });
-      folder.addBinding(t, 'x', { min: -8, max: 8, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'y', { min: -8, max: 8, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'z', { min: -8, max: 8, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'rotX', { label: 'rotación X', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'rotY', { label: 'rotación Y', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'rotZ', { label: 'rotación Z', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'escalaX', { label: 'escala X', min: 0.05, max: 4, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'escalaY', { label: 'escala Y', min: 0.05, max: 4, step: 0.01 }).on('change', sucio);
-      folder.addBinding(t, 'escalaZ', { label: 'escala Z', min: 0.05, max: 4, step: 0.01 }).on('change', sucio);
+      folder.addBinding(t, 'x', { min: -8, max: 8, step: 0.01 }).on('change', cambioTransform('x'));
+      folder.addBinding(t, 'y', { min: -8, max: 8, step: 0.01 }).on('change', cambioTransform('y'));
+      folder.addBinding(t, 'z', { min: -8, max: 8, step: 0.01 }).on('change', cambioTransform('z'));
+      folder.addBinding(t, 'rotX', { label: 'rotación X', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', cambioTransform('rotX'));
+      folder.addBinding(t, 'rotY', { label: 'rotación Y', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', cambioTransform('rotY'));
+      folder.addBinding(t, 'rotZ', { label: 'rotación Z', min: -Math.PI, max: Math.PI, step: 0.01 }).on('change', cambioTransform('rotZ'));
+      folder.addBinding(t, 'escalaX', { label: 'escala X', min: 0.05, max: 4, step: 0.01 }).on('change', cambioTransform('escalaX'));
+      folder.addBinding(t, 'escalaY', { label: 'escala Y', min: 0.05, max: 4, step: 0.01 }).on('change', cambioTransform('escalaY'));
+      folder.addBinding(t, 'escalaZ', { label: 'escala Z', min: 0.05, max: 4, step: 0.01 }).on('change', cambioTransform('escalaZ'));
       folder.addButton({ title: '⧉ Duplicar actor' }).on('click', () => this.duplicar(def));
       folder.addButton({ title: '✕ Quitar del escenario' }).on('click', () => this.quitar(def));
 
       this.vivos.push(vivo);
       // Incluso un actor estático necesita un primer pase para configurar sus
       // uniforms y hornear la geometría derivada de la ficha.
-      salon.update(0, 0, def.ficha.params);
+      salon.update(0, 0, this.paramsActor(vivo));
       this.aplicarTransform(vivo);
     } catch (err) {
       console.error(`No se pudo montar el actor «${def.ficha.nombre}»:`, err);
@@ -160,9 +189,11 @@ export class EscenarioSalon implements Salon {
   update(dt: number, tiempo: number, p: Params): void {
     this.raiz.rotation.y += (p.giro ?? 0) * dt;
     for (const v of this.vivos) {
-      if (v.transformSucio) this.aplicarTransform(v);
+      // Las transformaciones son hilos baratos y permanecen activas también
+      // para actores estáticos; solo se congela su cálculo interno.
+      this.aplicarTransform(v);
       if (!v.def.visible) continue;
-      if (v.def.actividad === 'dinamico') v.salon.update(dt, tiempo, v.def.ficha.params);
+      if (v.def.actividad === 'dinamico') v.salon.update(dt, tiempo, this.paramsActor(v));
     }
   }
 
@@ -170,11 +201,77 @@ export class EscenarioSalon implements Salon {
     const { def, envoltura } = vivo;
     const t = def.transform;
     envoltura.visible = def.visible;
-    envoltura.position.set(t.x, t.y, t.z);
-    envoltura.rotation.set(t.rotX, t.rotY, t.rotZ);
-    envoltura.scale.set(t.escalaX, t.escalaY, t.escalaZ);
+    const valor = (clave: typeof TRANSFORM_HILOS[number]['clave']) =>
+      this.bus.valorFinal(this.dirTransform(def.id, clave), t[clave]);
+    envoltura.position.set(valor('x'), valor('y'), valor('z'));
+    envoltura.rotation.set(valor('rotX'), valor('rotY'), valor('rotZ'));
+    envoltura.scale.set(valor('escalaX'), valor('escalaY'), valor('escalaZ'));
     envoltura.updateMatrix();
-    vivo.transformSucio = false;
+  }
+
+  /** Hilos que la Mesa de Sinestesia y los LFO pueden ofrecer en este instante. */
+  hilosModulables(): HiloModulable[] {
+    const hilos: HiloModulable[] = [];
+    for (const vivo of this.vivos) {
+      const nombre = vivo.def.ficha.nombre;
+      for (const h of TRANSFORM_HILOS) {
+        hilos.push({
+          etiqueta: `${nombre} · ${h.etiqueta}`,
+          dir: this.dirTransform(vivo.def.id, h.clave),
+          min: h.min,
+          max: h.max,
+        });
+      }
+      // Un actor estático conserva sus hilos de pose, pero no ofrece expresiones
+      // internas que el runtime no va a evaluar.
+      if (vivo.def.actividad !== 'dinamico') continue;
+      const defs = [...vivo.salon.params, ...(vivo.salon.pestanas ?? []).flatMap((p) => p.params)];
+      const unicas = new Map(defs.map((d) => [d.clave, d]));
+      for (const d of unicas.values()) {
+        if (!EXPRESIONES_SEGURAS.has(d.clave) || d.tipo === 'color' || d.opciones) continue;
+        if (vivo.def.ficha.params[d.clave] === undefined) continue;
+        hilos.push({
+          etiqueta: `${nombre} · expresión · ${d.etiqueta}`,
+          dir: this.dirParam(vivo.def.id, d.clave),
+          min: d.min,
+          max: d.max,
+        });
+      }
+    }
+    return hilos;
+  }
+
+  private registrarHilos(vivo: ActorVivo): void {
+    const { def, salon } = vivo;
+    for (const h of TRANSFORM_HILOS) {
+      const dir = this.dirTransform(def.id, h.clave);
+      this.bus.set(dir, def.transform[h.clave]);
+      this.bus.registrarRango(dir, h.min, h.max);
+    }
+    const defs = [...salon.params, ...(salon.pestanas ?? []).flatMap((p) => p.params)];
+    for (const d of defs) {
+      const base = def.ficha.params[d.clave];
+      if (base === undefined) continue;
+      const dir = this.dirParam(def.id, d.clave);
+      this.bus.set(dir, base);
+      this.bus.registrarRango(dir, d.min, d.max);
+    }
+  }
+
+  private paramsActor(vivo: ActorVivo): Params {
+    for (const clave in vivo.def.ficha.params) {
+      const base = vivo.def.ficha.params[clave];
+      vivo.paramsActuales[clave] = this.bus.valorFinal(this.dirParam(vivo.def.id, clave), base);
+    }
+    return vivo.paramsActuales;
+  }
+
+  private dirTransform(actorId: string, clave: string): string {
+    return `actor:${actorId}.transform.${clave}`;
+  }
+
+  private dirParam(actorId: string, clave: string): string {
+    return `actor:${actorId}.param.${clave}`;
   }
 
   dispose(escena: THREE.Scene): void {

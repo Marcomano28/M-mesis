@@ -41,8 +41,10 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P9 | 🟡 | Exportar escena con transforms XYZ | Corregida liberación prematura del Blob; descarga pendiente de verificar fuera del navegador integrado |
 | P10 | 🟡 | GLB de Trazo → ficha → Escenario | El mismo GLB debe reemplazar el nudo de muestra al montar el actor |
 | P11 | 🟡 | Exportar supershape + GLB de Trazo | El HTML debe reconstruir los dos actores; Delaunay/Relieve avisan que no se exportan aún |
+| P12 | ✅ | Destinos individuales de actor | La Mesa ofreció pose XYZ y expresiones; `ratón X → Marioneta · rotación Y` respondió de 0.19 a 0.72 sin errores |
+| P13 | 🟡 | Dos marionetas con micrófono | `audio ataque → escala Y` de una y `audio nivel → rotación Z` de otra; la escena global debe quedar quieta |
 
-**Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P6 necesita conservar o proporcionar una ficha de escena v1 real.
+**Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
 ### No probar todavía como funcionalidad terminada
 
@@ -62,6 +64,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | 14-07-2026 | `codex/escenario-v2` · `9d659a1` | Documento v2, diálogo, alta y duplicación de actores, guardado básico | Base técnica ✅ · ronda visual P1–P9 pendiente |
 | 14-07-2026 | `codex/escenario-v2` | P1–P9: dos familias, persistencia, 10 actores, 3 reentradas y export | P1/P2/P3/P5/P8 ✅ · P4/P6/P7/P9 🟡 |
 | 15-07-2026 | `codex/escenario-v2` | Fichas conservan GLB de Trazo, polaridad de papel/grafito y export de GLB embebido | Compilación ✅ · P10/P11 🟡 para validación visual |
+| 15-07-2026 | `main` | Hilos de pose y expresión por actor conectados a LFO, memoria y sinestesia | P12 ✅ · P13 🟡 para prueba visual con micrófono |
 
 ---
 
@@ -116,6 +119,9 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E6 | Actor estático vs dinámico | Estático queda visualmente congelado; dinámico conserva giro/evolución |
 | E7 | Ocultar, duplicar y transformar XYZ un actor | Visibilidad inmediata; copia independiente; rotación y escala por eje persisten al guardar/cargar |
 | E8 | Restaurar una escena con varios actores | Entran progresivamente, uno por frame; la interfaz no queda bloqueada durante todo el montaje |
+| E9 | Mesa de Sinestesia en el Escenario | El destino distingue escena global y cada actor por nombre |
+| E10 | Actor estático con ruta a transform | Se mueve por posición/rotación/escala sin reactivar su cálculo interno |
+| E11 | Intentar modular topología con audio | Resolución, puntos y semilla no aparecen entre los hilos de actor |
 
 ## Cierre
 

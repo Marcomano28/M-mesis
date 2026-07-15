@@ -34,7 +34,7 @@ const fabricas = {
 };
 
 const galeria = new Galeria(
-  [new SupershapesSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), new EscenarioSalon(fabricas)],
+  [new SupershapesSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), new EscenarioSalon(fabricas, bus)],
   engine,
   bus,
 );
