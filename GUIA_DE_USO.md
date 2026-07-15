@@ -1,7 +1,7 @@
 # MIA — Guía de uso
 ### La ruta de acciones del taller
 
-*Documento vivo · actualizado el 15 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md*
+*Documento vivo · actualizado el 15 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md y RUTA_AL_VIDEOCLIP.md*
 
 **Estado actual:** camerinos, fichas y **Escenario v2** utilizables. Los actores ya tienen identidad, visibilidad, transform completo, duplicación, modo estático/dinámico y **hilos individuales** para las fuentes vivas. La cámara de obra, luces escénicas, vestuario por actor y timeline musical todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
 
@@ -148,3 +148,5 @@ Antes de avanzar a cámara y timeline, la ronda mínima es:
 9. Exportar una escena con una supershape y un GLB de Trazo y Grafito: el HTML debe mostrar ambos.
 
 Esta prueba valida los cimientos. La prueba de ópera —música, luces, cámara y coreografía temporal— se añadirá cuando esas piezas existan.
+
+La secuencia de construcción desde estos cimientos hasta una toma audiovisual completa se mantiene en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.

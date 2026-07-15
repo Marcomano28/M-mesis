@@ -1,9 +1,10 @@
 # MIA — Plan Estratégico
 ### El Taller: modelar · coleccionar · componer · (tocar)
 
-*Versión 2.1 — Julio 2026 · sustituye a la v1.0 ("Galería viva")*
+*Versión 2.2 — Julio 2026 · sustituye a la v1.0 ("Galería viva")*
 *Ruta de acciones del taller: ver **GUIA_DE_USO.md***
 *Fundamento conceptual y plano del templo: ver **BIBLIA_CONCEPTUAL.md** (este plan ejecuta; la biblia orienta)*
+*Camino técnico hasta una obra grabada: ver **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)***
 
 ---
 
@@ -44,11 +45,13 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 | Salón **Bajo Relieve** | ✅ | Extrusión por estela del puntero (canvas 2D→textura); 6 niveles de textura + paleta cosenoidal; pestaña wireframe; GLB por defecto en `public/` |
 | Salón **Delaunay** | ✅ GPU | Triangulación (Delaunator, CPU) + anidado instanciado en GPU (TSL); figura Plano/Room (cara apagable); degradado de color y extrude dentro/fuera por profundidad; poda LOD adaptativa por área de triángulo |
 | **Fichas** (cajonera) | ✅ | Captura de miniatura sincronizada con el frame WebGPU; IndexedDB; cargar/borrar; los paneles respetan valores cargados |
-| **El Escenario** | ✅ | Botón ➕ en cards → actor con instancia propia del salón (uniforms independientes); transforms por actor; giro global; la composición persiste al navegar |
-| **Escenas como fichas** | ✅ | ☆ en el Escenario guarda la composición completa (campo `extra` de la ficha, hooks `estadoExtra`/`cargarEstadoExtra`); clic en la card restaura los actores |
-| **Export HTML del Escenario** | ✅ v1 | ⎙ genera HTML autocontenido que reproduce la escena (figuras, vistas, colores, transforms, animación) con la partitura JSON embebida. Actores con GLB se omiten por ahora |
-| **Moduladores (LFOs)** | ✅ | Plano de modulación en el bus: base (sliders/fichas) + Σ desplazamientos, con clamp por rango. Panel 〰 global; 5 formas de onda; destino = cualquier slider del salón activo. Fichas y export guardan la base limpia |
-| Cargador GLB compartido | ✅ | `core/CargadorGLB.ts` con decoder Draco **local** (`public/draco/`) — funciona offline; auto-orientación de relieves en Bajo Relieve (eje delgado → cámara) |
+| **El Escenario v2** | ✅ | Actores con ID estable, transform XYZ, visibilidad, duplicación, actividad estática/dinámica y entrada progresiva |
+| **Hilos individuales** | ✅ | Pose y expresiones seguras direccionadas como `actor:<id>...`; ratón, LFO, memoria y audio pueden actuar por personaje |
+| **Escenas como fichas** | ✅ | ☆ guarda DocumentoEscena, actores y assets GLB de Trazo; clic en la card restaura la puesta |
+| **Export HTML del Escenario** | 🟡 | Reproduce Formas Exóticas y Trazo/GLB con transforms. Delaunay, Relieve, rutas, cámara de obra y runtime musical aún no están unificados |
+| **Moduladores (LFOs)** | ✅ | Base + Σ desplazamientos con clamp; cinco ondas y destinos de salón/actor |
+| **Mesa de Sinestesia** | ✅ MVP | Micrófono, MIDI, ratón y pulso → destino con rango, curva, ataque y caída; falta persistencia y matriz de grupos |
+| Cargador GLB compartido | ✅ | Draco local; Trazo guarda el binario en ficha y lo transporta al Escenario/export |
 | Exportador «Imprimir» por salón | ✅ v1 | HTML autocontenido vía CDN con valores horneados |
 | Panel de errores en pantalla | ✅ | Excepciones, promesas y console.error visibles; el loop sobrevive a fallos de un salón |
 | Depuración | ✅ | `window.MIA` (engine, bus, galeria) expuesto en consola |
@@ -74,7 +77,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 │  FÁBRICAS   salonId → () => new Salon()                    │
 │  (el Escenario instancia salones como actores)             │
 ├────────────────────────────────────────────────────────────┤
-│  FUENTES    sliders/paneles · fichas · [LFOs] · [audio/MIDI]│
+│  FUENTES    sliders · fichas · LFOs · audio/MIDI · memoria │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -83,7 +86,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 - **Ficha**: `{ id, nombre, salonId, params, miniatura, fecha }`. El preset con cara. Persistente (IndexedDB). Es la unidad de colección Y la unidad de composición.
 - **Fábricas**: registro `salonId → constructor`. Permite al Escenario crear instancias frescas de cualquier salón (uniforms y materiales propios por actor) sin conocerlos. Un salón nuevo queda disponible como actor con una línea en `main.ts`.
 - **`recibirFicha()`**: hook opcional del contrato Salon — cualquier salón puede aceptar fichas (hoy solo el Escenario lo implementa).
-- **Actor**: `{ ficha (params congelados), transform {x,y,z,rotY,escala} }`. Su animación viene de los parámetros de la ficha (giro, etc.) más el giro global de escena.
+- **Actor**: ficha + ID estable + transform XYZ + actividad. Sus hilos usan direcciones `actor:<id>.transform.*` y `actor:<id>.param.*`; las rutas musicales modulan sin destruir la base.
 - **Modos de exposición**: Puntos / Alambre / Caras como atributo estándar (hoy en Formas Exóticas; generalizable vía el tipo `opciones` del ParamDef).
 
 **Lecciones de runtime que ya son reglas del proyecto:**
@@ -116,8 +119,8 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 ## 5. Hoja de ruta (revisada tras el Escenario)
 
 **Fase A — Madurar el ciclo taller** ✅ *(completada salvo pulidos)*
-- ~~Escenas guardadas como fichas~~ ✅ · ~~Export HTML del Escenario~~ ✅ v1
-- Pulidos pendientes: sincronizar el selector de salón al cargar fichas; tamaño de punto en WebGPU (sprites instanciados); GLB dentro de fichas (binario en IndexedDB); actores GLB en el export.
+- Escenas v2, GLB de Trazo dentro de fichas, actores GLB en export y hilos individuales ✅
+- Pulidos pendientes: sincronizar selector; sprites instanciados para puntos WebGPU; sustituir plantillas parciales de export por un `RuntimeEscena` compartido.
 
 ### Las etapas del templo (implementación de la BIBLIA_CONCEPTUAL)
 
@@ -130,7 +133,7 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 
 **Etapa 2 — El Barniz v1** *(la gramática estética)*
 - Ficha de barniz: paleta (rangos), gramática de movimiento (suavizados globales asimétricos), materia (vistas/grano), presupuesto de caos. Aplicable sobre cualquier salón o escena; slider de interpolación entre dos barnices.
-- Incluye pendientes heredados: moduladores guardados en fichas; transforms de actores ruteados por el bus.
+- Pendiente heredado: moduladores y rutas guardados en fichas. Los transforms de actores ya están ruteados por el bus.
 - *Criterio:* la misma escena atravesando dos barnices produce dos mundos reconocibles.
 
 **Etapa 3 — El protocolo de la Semilla** *(la dramaturgia)*
@@ -138,11 +141,11 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - *Criterio:* un viaje completo de 3 minutos conducido solo con LFOs que se sienta narrado, no agitado.
 
 **Etapa 4 — El oído crudo** *(entra la guitarra)*
-- Web Audio + AudioWorklet + Meyda: RMS, centroide, flatness, onsets. Web MIDI si hay pastilla. **Calibración por sesión** (los rangos de TU guitarra). Monitor de rasgos en panel + medición de latencia real en tu máquina (el veredicto navegador vs. Tauri se toma aquí, con números).
+- Prototipo actual: `AnalyserNode`, RMS/ataque, micrófono y MIDI ✅. Producción pendiente: AudioWorklet + rasgos espectrales + **calibración por sesión**, monitor y medición de latencia real.
 - *Criterio:* rasgos visibles en vivo; onset→pulso visual sintiéndose instantáneo.
 
 **Etapa 5 — La Matriz de Mapeo** *(el oído aprende a traducir)*
-- UI fuentes × destinos: curva, rango y suavizado asimétrico por celda; mapeos 1:N y N:1. Fuentes: rasgos (Et. 4) + acumuladores (Et. 1). Fichas de sinestesia (la matriz se guarda/carga). **Presets anclados en la matemática compartida** (§II.4 de la biblia: intervalos↔proporciones, m como simetría).
+- Mesa v1 operativa ✅: fuente, destino individual/global, curva, rango y suavizado asimétrico. Falta matriz 1:N/N:1, grupos, persistencia y fichas de sinestesia ancladas en la matemática compartida.
 - *Criterio:* cambiar de ficha de sinestesia en vivo transforma el carácter del viaje sin tocar código.
 
 **Etapa 6 — Los Gestos** *(el vocabulario del músico)*
@@ -208,10 +211,15 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 
 ## 6. Riesgos y decisiones abiertas
 
-- **Exportador del Escenario**: componer los códigos de varios salones en un solo HTML es la parte con más incógnitas — prototipar temprano en Fase A.
-- **Fichas y assets**: las fichas de Trazo y Grafito / Bajo Relieve no guardan el GLB (montan el modelo por defecto). Decidir: ¿binarios en IndexedDB o referencia a archivo?
+- **Reloj y sincronía**: audio, render, timeline y captura no pueden avanzar con relojes independientes. El tiempo de Web Audio será la referencia.
+- **Exportador del Escenario**: las plantillas parciales divergen del editor. Debe extraerse un runtime único usado por editor, replay, HTML y render.
+- **Fichas y assets**: Trazo ya guarda GLB; falta deduplicación por hash y aplicar el mismo contrato a Bajo Relieve.
+- **Captura**: la toma directa preserva la espontaneidad pero también los frames perdidos. Se combinará con replay determinista para master.
+- **Rutas**: funcionan en vivo pero aún no viajan en DocumentoEscena; esta es la próxima migración estructural.
 - **Puntos en WebGPU**: tamaño fijo 1px por diseño de la API — resolver con sprites instanciados cuando toque (habilita además tamaño por punto modulable).
 - **Crecimiento del panel de actores**: con >10 actores hará falta agrupar/plegar; evaluar entonces si el Escenario merece UI propia fuera de Tweakpane.
+
+La secuencia operacional y los criterios de terminado están desarrollados en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.
 
 ---
 

@@ -1,10 +1,10 @@
 # MIA
 
-**Un taller de arte generativo en el navegador** — modelar, coleccionar, componer y (pronto) tocar figuras paramétricas evaluadas en la GPU con Three.js WebGPU + TSL.
+**Un taller e instrumento audiovisual en el navegador** — modelar, coleccionar, componer y tocar figuras paramétricas evaluadas en la GPU con Three.js WebGPU + TSL.
 
 MIA nació como una galería de efectos y se convirtió en un **taller con depósito de obra y sala de montaje**. Eliges un salón (una familia de efectos), mueves sus controles, guardas las figuras que valen la pena como *fichas*, las combinas en escenas y las animas — y exportas cualquiera de ellas como un HTML autónomo.
 
-> Documentación en profundidad: **[GUIA_DE_USO.md](GUIA_DE_USO.md)** (la ruta de acciones paso a paso) y **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)** (visión, arquitectura y hoja de ruta).
+> Documentación: **[GUIA_DE_USO.md](GUIA_DE_USO.md)** (uso), **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)** (arquitectura) y **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)** (pasos técnicos hasta una performance grabada).
 
 ---
 
@@ -15,7 +15,7 @@ El taller tiene cuatro espacios:
 1. **Los salones (fábricas)** — donde se *modela*: cada salón es una familia de efectos con panel de controles autogenerado, pestañas de variantes y modos de exposición (Puntos / Alambre / Caras).
 2. **La cajonera (depósito)** — donde se *colecciona*: las figuras se guardan como **fichas** (miniatura + parámetros exactos), persistentes entre sesiones en IndexedDB.
 3. **El Escenario (sala de montaje)** — donde se *compone*: las fichas se colocan como **actores** independientes con su propia posición, rotación y escala.
-4. **El instrumento (futuro)** — donde se *tocará*: guitarra / MIDI modulando en tiempo real los parámetros de todo lo anterior.
+4. **El instrumento (en construcción)** — donde se *toca*: micrófono, guitarra/MIDI, ratón y memoria modulando la escena completa o los hilos de cada actor.
 
 La decisión de arquitectura que lo hace posible: **los salones solo entienden de parámetros numéricos y no saben de dónde vienen** — un slider, una ficha, un preset, un LFO o, mañana, una guitarra. Todas esas fuentes escriben en un mismo bus de parámetros (`ParamBus`); el salón solo lee.
 
@@ -31,7 +31,7 @@ Una ramificación conceptual posible, desarrollada en el plan, es MIA como **lut
 │ Formas    │ Trazo y   │ Bajo      │ Delaunay │ EL ESCENARIO│
 │ Exóticas  │ Grafito   │ Relieve   │          │ (compone)   │
 ├───────────┴───────────┴───────────┴──────────┴─────────────┤
-│  FUENTES   sliders · fichas · LFOs · [audio/MIDI futuro]   │
+│  FUENTES   sliders · fichas · LFOs · audio/MIDI · memoria  │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,7 +45,7 @@ Una ramificación conceptual posible, desarrollada en el plan, es MIA como **lut
 | **Trazo y Grafito** | Cross-hatching y lápiz *sketchy* procedural en TSL por niveles de luz, con temblor y grano. Importa modelos GLB. |
 | **Bajo Relieve** | Relieve revelado por la estela del puntero (canvas 2D → textura), con paleta cosenoidal. Trae un GLB por defecto. |
 | **Delaunay** | Triangulación de Delaunay sobre un plano o una *room* (cubo con una cara apagable para ver dentro). Cada triángulo se dibuja con copias anidadas escaladas y giradas, instanciadas en la GPU en una sola *draw call*; degradado entre dos colores según la profundidad, extrude hacia dentro/fuera y poda LOD adaptativa. |
-| **El Escenario** | La sala de montaje: coloca fichas como actores, con transforms por actor y giro global. Las escenas se guardan como fichas completas. |
+| **El Escenario** | Coloca fichas como actores con identidad, pose XYZ y expresiones propias; las fuentes vivas pueden accionar sus hilos individualmente. |
 
 Salones planificados (ver plan): Materia de Puntos (compute shaders), Campos y Ruido, Líneas y Trazos, Materiales Imposibles, Luz y Atmósfera.
 
@@ -89,15 +89,15 @@ En la consola del navegador (F12), `window.MIA` expone `engine`, `bus`, `galeria
 ## El ciclo de trabajo
 
 ```
-  MODELAR            COLECCIONAR         COMPONER            ANIMAR            IMPRIMIR
- salón + sliders  →  ☆ ficha en 🗂   →  ➕ actores en 🎭  →  〰 LFOs encima  →  ⎙ HTML autónomo
+  MODELAR            COLECCIONAR         COMPONER            INTERPRETAR       IMPRIMIR
+ salón + sliders  →  ☆ ficha en 🗂   →  ➕ actores en 🎭  →  audio/rutas     →  ⎙ HTML autónomo
                      (persiste)          (persiste)          (en vivo)          (para el mundo)
 ```
 
 - **Modelar** — elige salón, mueve sliders; en salones con pestañas, cada una es una variante.
 - **Coleccionar** — *☆ Guardar ficha* guarda miniatura + parámetros exactos (persisten entre sesiones).
 - **Componer** — desde la cajonera, *➕* manda una ficha al Escenario como actor; acomódalo en el panel 🎭.
-- **Animar** — *〰 Moduladores* añade LFOs que suman sobre la base del slider (con clamp por rango).
+- **Interpretar** — LFO, ratón, micrófono o MIDI actúan sobre la escena o cada actor sin alterar su pose base.
 - **Imprimir** — *⎙* descarga un HTML autocontenido que reproduce la figura con los valores horneados; se abre con doble clic, sin instalar nada.
 
 Los pasos completos, con atajos y trucos, están en **[GUIA_DE_USO.md](GUIA_DE_USO.md)**.
@@ -124,7 +124,7 @@ Añadir un salón nuevo es crear su clase (implementando el contrato `Salon`) y 
 
 ## Estado
 
-El ciclo del taller (modelar → coleccionar → componer → animar → imprimir) está funcionando. En curso: guardar los LFOs dentro de las fichas y modular los transforms de los actores. Después: los salones de compute shaders (partículas masivas) y, como Acto II, el instrumento musical escribiendo en el mismo bus. Una posible deriva de largo plazo es la luthería digital: tocar formas, guardar mapeos de sinestesia y grabar performances. Detalle completo en **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)**.
+El ciclo del taller y los hilos individuales están funcionando. En curso: guardar las rutas dentro de la escena, crear un transporte musical común, registrar la performance y capturar audio/vídeo. El destino y sus criterios técnicos están en **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)**.
 
 ---
 

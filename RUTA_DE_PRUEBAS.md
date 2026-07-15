@@ -54,7 +54,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | ⬜ | Luces como actores escénicos | El documento reserva el campo, no hay editor/runtime |
 | ⬜ | Timeline y keyframes | Las pistas están tipadas, pero aún no se evalúan |
 | ⬜ | Música como reloj maestro | La sinestesia reacciona, pero no existe transporte musical |
-| ⬜ | Modulación individual por actor | Los parámetros de actor aún no están direccionados en el bus |
+| ✅ | Modulación individual por actor | Pose y expresiones seguras ya usan direcciones estables por ID |
 | ⬜ | Vestuario por actor | Concepto definido; contrato todavía pendiente |
 
 ### Registro de rondas
@@ -126,7 +126,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 ## Cierre
 
 - Hallazgos → se arreglan en el momento o se anotan aquí con ❌ y ticket en el plan.
-- Si P1–P9 quedan ✅: luz verde para **cámara de obra + transporte/timeline mínimo**.
+- P13 valida el cierre de la marioneta; después comienza **DocumentoEscena v3 + transporte mínimo**, según `RUTA_AL_VIDEOCLIP.md`.
 - Después de cada sesión se actualizan estados y se añade una fila al **Registro de rondas**.
 
 ---
@@ -138,4 +138,4 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 3. **Tu clic en "Permitir"** cuando el navegador pida micrófono (C1) — es lo único que yo no puedo hacer.
 4. **Fuente de sonido** para el bloque C: palmas o voz bastan; si tienes la guitarra o interfaz a mano, mejor (dime qué entrada usas).
 5. **MIDI** (opcional): si tienes controlador/pastilla conectado, dímelo para incluir C4.
-6. Para la ronda inmediata basta con decir **“listo para P1–P9”**. Audio y MIDI pueden dejarse para los bloques C posteriores.
+6. Para la ronda inmediata basta con decir **“listo para P13”**: dos actores, dos rutas de audio y giro global quieto.
