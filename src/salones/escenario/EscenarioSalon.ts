@@ -456,8 +456,9 @@ export class EscenarioSalon implements Salon {
   }
 
   // ————— Exportador: HTML autocontenido que reconstruye la escena —————
-  // Incluye las recetas de Formas Exóticas y los GLB guardados de Trazo y
-  // Grafito. Otros salones se identifican en la consola para no ocultarlos.
+  // Reproductores autónomos: Formas Exóticas (clásica/flor/serpiente), Delaunay
+  // (triángulos y celdas Room, paleta luz/sombra) y los GLB de Trazo y Grafito.
+  // Actores sin reproductor se identifican en la consola para no ocultarlos.
 
   exportar(p: Params): string {
     const escena = {
@@ -502,6 +503,7 @@ const PLANTILLA_ESCENA = `<!doctype html>
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import Delaunator from 'https://cdn.jsdelivr.net/npm/delaunator@5/+esm';
 const E = __ESCENA__;
 
 // ——— matemática de Formas Exóticas ———
@@ -549,6 +551,146 @@ function malla(fn, n1, n2){
   return g;
 }
 
+// ——— Serpiente (cuerpo orgánico animado; port de PLANTILLA_SERPIENTE) ———
+function makeNoise2D(){ const F2=0.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6;
+  const g3=[[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[1,0],[-1,0],[0,1],[0,-1],[0,1],[0,-1]];
+  const pp=Array.from({length:256},(_,i)=>i); for(let i=255;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pp[i],pp[j]]=[pp[j],pp[i]];}
+  const perm=Array.from({length:512},(_,i)=>pp[i&255]);
+  return (xin,yin)=>{ const s=(xin+yin)*F2,i=Math.floor(xin+s),j=Math.floor(yin+s),t=(i+j)*G2;
+    const x0=xin-(i-t),y0=yin-(j-t),i1=x0>y0?1:0,j1=x0>y0?0:1,x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2,ii=i&255,jj=j&255;
+    const dot=(gi,x,y)=>{const g=g3[gi%12];return g[0]*x+g[1]*y;};
+    const gi0=perm[ii+perm[jj]],gi1=perm[ii+i1+perm[jj+j1]],gi2=perm[ii+1+perm[jj+1]];
+    let n0=0,n1=0,n2=0,t0=0.5-x0*x0-y0*y0; if(t0>=0){t0*=t0;n0=t0*t0*dot(gi0,x0,y0);}
+    let t1=0.5-x1*x1-y1*y1; if(t1>=0){t1*=t1;n1=t1*t1*dot(gi1,x1,y1);}
+    let t2=0.5-x2*x2-y2*y2; if(t2>=0){t2*=t2;n2=t2*t2*dot(gi2,x2,y2);}
+    return 70*(n0+n1+n2); };
+}
+const mapV=(v,a,b,c,d)=>c+(v-a)/(b-a)*(d-c), cl=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+function crearSerpiente(P){
+  const SC=0.01, RES=Math.max(8,Math.round(P.resolucion??256)), KR=RES/256;
+  const N1=Math.max(6,Math.min(60,Math.round(30*KR))), N=Math.max(3,Math.min(24,Math.round(12*KR)));
+  const N2=Math.max(20,Math.min(160,Math.round(80*KR))), K=Math.ceil(N2/N);
+  const R=P.sR??200, Z=P.sZ??1000, TRN=P.sTrn??3.4, MV=P.sMV??-0.15, MXV=P.sMXV??1.35;
+  const R1=[P.sr1m??5,P.sr1n1??0.1,P.sr1n2??1.7,P.sr1n3??1.7], R2=[P.sr2m??7,P.sr2n1??0.3,P.sr2n2??0.5,P.sr2n3??0.5];
+  const noise2D=makeNoise2D();
+  const pos=(r,p,th)=>{ const r1=sr(th,R1[0],R1[1],R1[2],R1[3]), r2=sr(th,R2[0],R2[1],R2[2],R2[3]);
+    return new THREE.Vector3(r*r1*Math.cos(th+TRN)-(1-p)**2*500+200, r*r2*Math.sin(th+TRN)+100*Math.sin(Math.PI*2*p), -Z*(1-p)+50*Math.sin(Math.PI*2*p)+120); };
+  const inst=[]; for(let i=0;i<N1;i++)for(let j=0;j<N;j++) inst.push({seed:10+Math.random()*990,off:0.4+0.8*(Math.random()*2-1),di:120+Math.random()*680,i,j});
+  const V=N1*N*K*4*3, posArr=new Float32Array(V*3), colArr=new Float32Array(V*3);
+  function build(t){ let idx=0;
+    for(const {seed,off,di,i,j} of inst){ for(let k=0;k<K;k++){ const ind=j+(t+k)*N;
+      const p0=mapV(ind+0.5,0,N2,MV,MXV),p1=mapV(ind,0,N2,MV,MXV),p2=mapV(ind+1,0,N2,MV,MXV);
+      const th0=Math.PI*2*(i+0.5)/N1,th1=Math.PI*2*i/N1,th2=Math.PI*2*(i+1)/N1;
+      const par=(1-cl(2*p0-off,0,1))**3.3, rn=mapV(noise2D(seed+2*p0,0),-1,1,0,1), rV=R-20-180*rn**5, d=di*par, q=cl(par+0.05,0,1);
+      const v0=pos(rV+d,p0,th0), v1=pos(R+d,p1,th1).lerp(v0,q), v2=pos(R+d,p2,th1).lerp(v0,q), v3=pos(R+d,p2,th2).lerp(v0,q), v4=pos(R+d,p1,th2).lerp(v0,q);
+      const ca=900*mapV(noise2D(2*seed+2.5*p0,0),-1,1,0,1)**8, cb2=200*mapV(noise2D(2*seed+9.5*p0,0),-1,1,0,1)**6;
+      const br=cl((5+0.2*ca+0.8*cb2-(1-p0)*130)/255,0,1);
+      for(const [a,b,c] of [[v0,v1,v2],[v0,v3,v2],[v0,v3,v4],[v0,v1,v4]]) for(const v of [a,b,c]){
+        posArr[idx*3]=v.x*SC; posArr[idx*3+1]=v.y*SC; posArr[idx*3+2]=v.z*SC;
+        colArr[idx*3]=br; colArr[idx*3+1]=br*1.05; colArr[idx*3+2]=br*0.75; idx++; }
+    }}
+  }
+  build(P.fase??0);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(posArr,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(colArr,3));
+  const cuerpo=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
+  cuerpo.rotation.set(Math.PI*0.9,Math.PI*0.65,0); cuerpo.frustumCulled=false;
+  const figura=new THREE.Group(); figura.add(cuerpo); figura.scale.setScalar(P.escala??2);
+  let fase=P.fase??0;
+  const tick=(T,dt)=>{ fase+=dt*(P.velocidad??0.3); build(fase);
+    geo.getAttribute('position').needsUpdate=true; geo.getAttribute('color').needsUpdate=true; };
+  return {figura,tick};
+}
+
+// ——— Delaunay (anidado sobre triángulos o celdas Room; port CPU del salón) ———
+function crearDelaunay(P){
+  const rng=(s)=>()=>{ s=(s+0x6D2B79F5)|0; let t=Math.imul(s^s>>>15,1|s); t=(t+Math.imul(t^t>>>7,61|t))^t; return ((t^t>>>14)>>>0)/4294967296; };
+  const rr=rng((Math.round(P.semilla??1))>>>0);
+  const xy=[-1,-1,1,-1,1,1,-1,1];
+  for(let i=0;i<Math.round(P.puntos??40);i++) xy.push(rr()*2-1,rr()*2-1);
+  const del=new Delaunator(xy), tri=del.triangles, half=del.halfedges, nTri=tri.length/3;
+  const dst=(x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
+  // Parches: triángulos directos, o el teselado dual de Room (quad entre centros
+  // de triángulos vecinos + extremos de la arista, partido en 2 sub-triángulos).
+  const parches=[]; let maxSize=0;
+  if((P.trama??1)!==0){
+    const cX=new Float32Array(nTri), cY=new Float32Array(nTri);
+    for(let t=0;t<nTri;t++){ const a=tri[t*3],b=tri[t*3+1],d=tri[t*3+2];
+      cX[t]=(xy[a*2]+xy[b*2]+xy[d*2])/3; cY[t]=(xy[a*2+1]+xy[b*2+1]+xy[d*2+1])/3; }
+    for(let e=0;e<tri.length;e++){ const o=half[e]; if(o<0||e>o) continue;
+      const tA=(e/3)|0,tB=(o/3)|0,u=tri[e],v=tri[e%3===2?e-2:e+1];
+      const ux=xy[u*2],uy=xy[u*2+1],vx=xy[v*2],vy=xy[v*2+1];
+      const gx=(cX[tA]+ux+cX[tB]+vx)/4, gy=(cY[tA]+uy+cY[tB]+vy)/4;
+      const size=dst(cX[tA],cY[tA],ux,uy)+dst(ux,uy,cX[tB],cY[tB])+dst(cX[tB],cY[tB],vx,vy)+dst(vx,vy,cX[tA],cY[tA]);
+      if(size>maxSize) maxSize=size;
+      parches.push({ax:cX[tA],ay:cY[tA],bx:ux,by:uy,cx:cX[tB],cy:cY[tB],gx,gy,size});
+      parches.push({ax:cX[tA],ay:cY[tA],bx:cX[tB],by:cY[tB],cx:vx,cy:vy,gx,gy,size});
+    }
+  } else {
+    for(let t=0;t<nTri;t++){ const a=tri[t*3],b=tri[t*3+1],d=tri[t*3+2];
+      const ax=xy[a*2],ay=xy[a*2+1],bx=xy[b*2],by=xy[b*2+1],cx=xy[d*2],cy=xy[d*2+1];
+      const gx=(ax+bx+cx)/3, gy=(ay+by+cy)/3;
+      const size=dst(ax,ay,bx,by)+dst(bx,by,cx,cy)+dst(cx,cy,ax,ay);
+      if(size>maxSize) maxSize=size;
+      parches.push({ax,ay,bx,by,cx,cy,gx,gy,size});
+    }
+  }
+  maxSize=maxSize||1;
+  const M=()=>new THREE.Matrix4();
+  const cubo=[M().setPosition(0,0,1),M().makeRotationX(Math.PI).setPosition(0,0,-1),
+    M().makeRotationY(Math.PI/2).setPosition(1,0,0),M().makeRotationY(-Math.PI/2).setPosition(-1,0,0),
+    M().makeRotationX(-Math.PI/2).setPosition(0,1,0),M().makeRotationX(Math.PI/2).setPosition(0,-1,0)];
+  const caras=P.figura===1?cubo.filter((_,i)=>i!==Math.round(P.caraOff??-1)):[M()];
+  const niveles=Math.max(1,Math.round(P.anidado??8)), umbral=Math.max(0,P.umbral??0.05);
+  const lv=parches.map(q=>umbral>0?Math.max(1,Math.min(niveles,Math.round(q.size/(umbral*3)))):niveles);
+  const V=lv.reduce((a,b)=>a+b,0)*caras.length*3;
+  const posArr=new Float32Array(V*3), colC=new Float32Array(V*4), colA=new Float32Array(V*4);
+  const room=(P.rellenoCaras??1)===1, amp=P.ampDeg??0.7, w=new THREE.Vector3();
+  const c1=new THREE.Color(P.color??0x8ab4ff), c2=new THREE.Color(P.color2??0xff5a8c);
+  const luz=new THREE.Color(P.colorRelleno??0xf0faec), som=new THREE.Color(P.colorSombra??0x000000);
+  function build(t){ let k=0;
+    for(const m of caras) for(let i=0;i<parches.length;i++){ const q=parches[i], sz=q.size/maxSize, mm=lv[i];
+      for(let l=0;l<mm;l++){
+        const s=(P.modoEsc??1)===1?1/(l+1):1-l/mm;
+        const ang=l*(P.giro??0)+t*(P.velGiro??0), ca=Math.cos(ang), sa=Math.sin(ang);
+        const z=l*(P.sepZ??0.03)*(P.extrude===1?-1:1);
+        // Paleta: degradado estructural o luz/sombra Room + contorno cálido.
+        const f=cl(l/mm,0,1)*amp, dA=1-cl(l/mm,0,1)*0.8;
+        const dR=c1.r+(c2.r-c1.r)*f, dG=c1.g+(c2.g-c1.g)*f, dB=c1.b+(c2.b-c1.b)*f;
+        const cN=(1-s)*0.7+(sz*0.8/s)*0.3, fill=cl(s-cN,0,1);
+        const fR=room?som.r+(luz.r-som.r)*fill:dR, fG=room?som.g+(luz.g-som.g)*fill:dG, fB=room?som.b+(luz.b-som.b)*fill:dB;
+        const aR=room?cl(s*0.1+cN*0.5,0,1):dR, aG=room?cl(cN*s,0,1):dG, aB=room?cl(cN*s-cN/3,0,1):dB;
+        for(const [px,py] of [[q.ax,q.ay],[q.bx,q.by],[q.cx,q.cy]]){
+          const rx=(px-q.gx)*s, ry=(py-q.gy)*s;
+          w.set(rx*ca-ry*sa+q.gx, rx*sa+ry*ca+q.gy, z).applyMatrix4(m);
+          posArr[k*3]=w.x; posArr[k*3+1]=w.y; posArr[k*3+2]=w.z;
+          colC[k*4]=fR; colC[k*4+1]=fG; colC[k*4+2]=fB; colC[k*4+3]=room?1:dA;
+          colA[k*4]=aR; colA[k*4+1]=aG; colA[k*4+2]=aB; colA[k*4+3]=room?0.32:dA;
+          k++;
+        }
+      }
+    }
+  }
+  build(0);
+  const attrPos=new THREE.BufferAttribute(posArr,3);
+  const gC=new THREE.BufferGeometry(); gC.setAttribute('position',attrPos); gC.setAttribute('color',new THREE.BufferAttribute(colC,4));
+  const gA=new THREE.BufferGeometry(); gA.setAttribute('position',attrPos); gA.setAttribute('color',new THREE.BufferAttribute(colA,4));
+  const mCaras=new THREE.Mesh(gC,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,side:THREE.DoubleSide,depthWrite:room}));
+  const mAlam=new THREE.Mesh(gA,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,wireframe:true,depthWrite:false}));
+  const pts=new THREE.Points(gA,new THREE.PointsMaterial({vertexColors:true,transparent:true,size:(P.puntoTam??1.5)*0.02,sizeAttenuation:true}));
+  const vista=P.vista??1;
+  mCaras.visible=vista===2||vista===3;
+  mAlam.visible=vista===1||vista===3||(vista===2&&room); // en Room el contorno acompaña a las caras
+  pts.visible=vista===0;
+  mCaras.renderOrder=1; mAlam.renderOrder=2;
+  const figura=new THREE.Group();
+  for(const o of [mCaras,mAlam,pts]){ o.frustumCulled=false; figura.add(o); }
+  figura.scale.setScalar(P.escala??2);
+  const tick=(P.velGiro??0)>0?(T)=>{ build(T); attrPos.needsUpdate=true; }:null;
+  return {figura,tick};
+}
+
 // ——— montaje de actores ———
 const escena = new THREE.Scene();
 const raiz = new THREE.Group(); escena.add(raiz);
@@ -587,8 +729,20 @@ for (const actor of E.actores){
     animados.push({ figura, giro: P.giro ?? 0 });
     continue;
   }
-  if (actor.salon !== 'supershapes') {
-    console.warn('Exportación parcial: este salón aún no tiene reproductor autónomo:', actor.nombre, actor.salon);
+  if (actor.salon === 'delaunay') {
+    const d = crearDelaunay(P);
+    aplicarActor(actor, d.figura);
+    animados.push({ figura: d.figura, giro: 0, tick: d.tick });
+    continue;
+  }
+  if (actor.salon === 'supershapes' && (P.modo ?? 0) === 2) {
+    const s = crearSerpiente(P);
+    aplicarActor(actor, s.figura);
+    animados.push({ figura: s.figura, giro: P.giro ?? 0, tick: s.tick });
+    continue;
+  }
+  if (actor.salon !== 'supershapes' || (P.modo ?? 0) === 3) {
+    console.warn('Exportación parcial: este actor aún no tiene reproductor autónomo:', actor.nombre, actor.salon, P.modo);
     continue;
   }
   const R = Math.min(Math.round(P.resolucion ?? 128), 192);
@@ -619,11 +773,11 @@ const cam = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, .1, 200); ca
 const r = new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); r.setPixelRatio(Math.min(devicePixelRatio,2));
 document.body.appendChild(r.domElement);
 const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true;
-const reloj = new THREE.Clock();
+const reloj = new THREE.Clock(); let T = 0;
 r.setAnimationLoop(()=>{
-  const dt = reloj.getDelta();
+  const dt = reloj.getDelta(); T += dt;
   raiz.rotation.y += E.giro*dt;
-  for (const a of animados) a.figura.rotation.y += a.giro*dt;
+  for (const a of animados){ a.figura.rotation.y += a.giro*dt; if (a.tick) a.tick(T, dt); }
   ctl.update(); r.render(escena,cam);
 });
 addEventListener('resize',()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); r.setSize(innerWidth,innerHeight); });
