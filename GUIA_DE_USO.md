@@ -1,9 +1,9 @@
 # MIA — Guía de uso
 ### La ruta de acciones del taller
 
-*Documento vivo · actualizado el 15 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md y RUTA_AL_VIDEOCLIP.md*
+*Documento vivo · actualizado el 16 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md y RUTA_AL_VIDEOCLIP.md*
 
-**Estado actual:** camerinos, fichas y **Escenario v3** utilizables. Cada personaje exporta una selección propia de **hilos individuales persistentes**; una ficha de escena conserva rutas de sinestesia, LFOs, acumuladores y su **transporte musical**. La cámara de obra, luces escénicas, vestuario por actor y pistas/keyframes todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
+**Estado actual:** camerinos, fichas y **Escenario v3** utilizables. Cada personaje exporta una selección propia de **hilos individuales y gestos corporales persistentes**; una ficha de escena conserva rutas de sinestesia, LFOs, acumuladores y su **transporte musical**. La cámara de obra, luces escénicas, vestuario por actor y pistas/keyframes todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
 
 ---
 
@@ -46,6 +46,12 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
    - **Ninguno** permite empezar de cero.
    - Los hilos se agrupan en movimiento, expresión y materia; resolución, semilla y demás parámetros que regeneran topología no aparecen.
    - El contador indica cuántos controles viajarán con el personaje.
+6. Abre **🎭 Ensayo del personaje** para preparar su repertorio corporal:
+   - Elige un hilo interno, pon nombre al gesto y fija **reposo**, **acción** y duración.
+   - **Lineal** llega a una pose y la sostiene hasta detenerla; **Ida y regreso** vuelve al reposo; **Bucle** repite el movimiento.
+   - **Suave** evita arranques mecánicos; **Recto** conserva una progresión uniforme.
+   - **＋ Guardar gesto** lo añade al repertorio y **▶ Probar** permite ensayarlo sin mover al personaje por el escenario.
+   - En este primer hito cada gesto edita un hilo. El formato de ficha ya admite varios canales para una futura edición compuesta.
 
 **Ruta corta:** `selector → pestaña → sliders → exposición/color`
 
@@ -59,6 +65,7 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
   - **➕** → la manda al Escenario como actor.
   - **✕** → la borra (pide confirmación).
   - `🧵 n` → número de capacidades expresivas que llevará al Escenario.
+  - `🎭 n` → número de gestos corporales que el personaje ya trae ensayados.
 
 **Ruta corta:** `figura que te gusta → ☆ → nombre → aparece en 🗂`
 
@@ -70,10 +77,12 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
 2. Panel **🎭 Actores**: cada actor tiene identidad estable, nombre, visibilidad, **x / y / z**, rotación XYZ, escala XYZ, duplicar y quitar.
    - **estático (ahorra)** configura la figura una vez y deja de evaluarla cada frame.
    - **dinámico** mantiene vivo el `update()` del camerino: úsalo si gira, respira, reacciona o evoluciona.
+   - **🎭 Gestos ensayados** reúne el repertorio que viajó con la ficha. Cada botón acciona únicamente los hilos internos de ese actor; no mueve la escena global ni otro ejemplar del mismo personaje.
 3. **giro global** (panel derecho) rota la escena entera; si una ficha lleva `giro` propio, ese actor se anima solo.
 4. La composición **persiste** aunque salgas del Escenario y vuelvas. Al restaurar una escena, los actores entran progresivamente —uno por frame— para evitar un bloqueo largo.
 5. **☆ Guardar ficha** estando en el Escenario = guarda **la escena completa**: actores, transforms, miniatura, actuación y configuración del transporte. Clic en esa card después = la escena vuelve entera y reemplaza la composición actual.
 6. Al quitar un actor se eliminan también las rutas, LFOs y acumuladores que lo usan como fuente o destino; así no quedan hilos apuntando a una marioneta inexistente.
+7. En el Escenario los gestos obedecen el reloj de la obra: durante la reproducción avanzan con el transporte; al detenerlo quedan congelados. **■ Detener gesto** retira su modulación y devuelve la pose base.
 
 **Ruta corta:** `🗂 → ➕➕➕ → acomodar en 🎭 → ☆ para congelar la escena`
 
@@ -172,6 +181,7 @@ Antes de avanzar a cámara y timeline, la ronda mínima es:
 11. Guardar una ficha con un solo hilo, subirla al Escenario y abrir la Mesa: solo debe aparecer ese hilo bajo el nombre del actor.
 12. En **♫ Transporte**, preparar, reproducir unos segundos y detener: el estado debe pasar por `preparado → reproduciendo → preparado` y volver a cero.
 13. Guardar una escena a 90 BPM, 3 pulsos, 12 s y sin bucle; alterar esos valores y restaurar la ficha: deben volver exactamente los cuatro.
+14. Crear un gesto de ida y regreso en un camerino, guardarlo con la ficha y subirla al Escenario: debe aparecer con su nombre bajo **🎭 Gestos ensayados** y afectar solo a ese actor.
 
 Esta prueba valida los cimientos y el reloj de la función. La prueba de ópera completa —registro de toma, luces, cámara y coreografía temporal— se añadirá al incorporar esas piezas.
 

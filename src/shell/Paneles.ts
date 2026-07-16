@@ -5,6 +5,7 @@
 import { Pane } from 'tweakpane';
 import type { Salon, ParamDef, HiloFichaDef } from '../core/Salon';
 import type { ParamBus } from '../core/ParamBus';
+import type { CurvaGesto, FormaGesto, GestoPersonaje } from '../core/Gestos';
 
 export interface PanelExtras {
   alGuardarFicha?: () => void;
@@ -12,6 +13,14 @@ export interface PanelExtras {
     catalogo: HiloFichaDef[];
     seleccion: Set<string>;
     alCambiar: () => void;
+  };
+  ensayo?: {
+    gestos: GestoPersonaje[];
+    hilos: HiloFichaDef[];
+    alCrear: (gesto: GestoPersonaje) => void;
+    alBorrar: (id: string) => void;
+    alProbar: (gesto: GestoPersonaje) => void;
+    alDetener: () => void;
   };
 }
 
@@ -113,6 +122,11 @@ export function crearPanel(salon: Salon, bus: ParamBus, extras?: PanelExtras): P
     carpeta.refresh();
   }
 
+  // — Camerino: repertorio corporal propio del personaje —
+  if (extras?.ensayo) {
+    crearEnsayoPersonaje(pane, salon, bus, extras.ensayo);
+  }
+
   // — Acciones propias del salón (cargar modelos, etc.) —
   for (const accion of salon.acciones ?? []) {
     pane.addButton({ title: accion.titulo }).on('click', accion.fn);
@@ -131,6 +145,115 @@ export function crearPanel(salon: Salon, bus: ParamBus, extras?: PanelExtras): P
   });
 
   return pane;
+}
+
+function crearEnsayoPersonaje(
+  pane: Pane,
+  salon: Salon,
+  bus: ParamBus,
+  ensayo: NonNullable<PanelExtras['ensayo']>,
+): void {
+  const carpeta = pane.addFolder({ title: '🎭 Ensayo del personaje', expanded: false });
+  if (!ensayo.hilos.length) {
+    const aviso = { texto: 'Este salón no tiene hilos internos.' };
+    carpeta.addBinding(aviso, 'texto', { label: 'estado', readonly: true });
+    return;
+  }
+
+  const porClave = new Map(ensayo.hilos.map((hilo) => [hilo.clave, hilo]));
+  const hiloInicial = ensayo.hilos[0];
+  const posicionBase = (hilo: HiloFichaDef): number => {
+    const clave = hilo.clave.slice('param.'.length);
+    const valor = bus.get(`${salon.id}.${clave}`, hilo.min);
+    return hilo.max === hilo.min ? 0 : limitar((valor - hilo.min) / (hilo.max - hilo.min), 0, 1);
+  };
+  const borrador: {
+    nombre: string;
+    hilo: string;
+    forma: FormaGesto;
+    curva: CurvaGesto;
+    duracion: number;
+    desde: number;
+    hasta: number;
+  } = {
+    nombre: 'gesto nuevo',
+    hilo: hiloInicial.clave,
+    forma: 'envolvente',
+    curva: 'suave',
+    duracion: 2,
+    desde: posicionBase(hiloInicial),
+    hasta: limitar(posicionBase(hiloInicial) + 0.3, 0, 1),
+  };
+
+  carpeta.addBinding(borrador, 'nombre', { label: 'nombre' });
+  carpeta.addBinding(borrador, 'hilo', {
+    label: 'hilo que mueve',
+    options: Object.fromEntries(ensayo.hilos.map((hilo) => [hilo.etiqueta, hilo.clave])),
+  }).on('change', (ev: { value: string }) => {
+    const hilo = porClave.get(ev.value);
+    if (!hilo) return;
+    borrador.desde = posicionBase(hilo);
+    borrador.hasta = limitar(borrador.desde + 0.3, 0, 1);
+    carpeta.refresh();
+  });
+  carpeta.addBinding(borrador, 'forma', {
+    label: 'evolución',
+    options: {
+      'Lineal (queda en pose)': 'lineal',
+      'Ida y regreso': 'envolvente',
+      'Bucle': 'loop',
+    },
+  });
+  carpeta.addBinding(borrador, 'curva', {
+    label: 'carácter',
+    options: { Suave: 'suave', Recto: 'lineal' },
+  });
+  carpeta.addBinding(borrador, 'duracion', { label: 'duración (s)', min: 0.1, max: 30, step: 0.1 });
+  carpeta.addBinding(borrador, 'desde', { label: 'reposo', min: 0, max: 1, step: 0.01 });
+  carpeta.addBinding(borrador, 'hasta', { label: 'acción', min: 0, max: 1, step: 0.01 });
+  carpeta.addButton({ title: '＋ Guardar gesto' }).on('click', () => {
+    const hilo = porClave.get(borrador.hilo);
+    if (!hilo) return;
+    ensayo.alCrear({
+      id: crypto.randomUUID(),
+      nombre: borrador.nombre.trim() || 'gesto sin nombre',
+      forma: borrador.forma,
+      curva: borrador.curva,
+      duracion: borrador.duracion,
+      canales: [{
+        hilo: hilo.clave,
+        etiqueta: hilo.etiqueta,
+        min: hilo.min,
+        max: hilo.max,
+        desde: borrador.desde,
+        hasta: borrador.hasta,
+      }],
+    });
+  });
+
+  if (ensayo.gestos.length) {
+    const repertorio = carpeta.addFolder({ title: `Repertorio (${ensayo.gestos.length})`, expanded: true });
+    for (const gesto of ensayo.gestos) {
+      const grupo = repertorio.addFolder({ title: gesto.nombre, expanded: false });
+      const resumen = {
+        descripcion: `${etiquetaForma(gesto.forma)} · ${gesto.duracion.toFixed(1)} s · ${gesto.canales.length} hilo${gesto.canales.length === 1 ? '' : 's'}`,
+      };
+      grupo.addBinding(resumen, 'descripcion', { label: 'partitura', readonly: true });
+      grupo.addButton({ title: '▶ Probar' }).on('click', () => ensayo.alProbar(gesto));
+      grupo.addButton({ title: '■ Detener' }).on('click', ensayo.alDetener);
+      grupo.addButton({ title: '✕ Borrar gesto' }).on('click', () => ensayo.alBorrar(gesto.id));
+    }
+  }
+}
+
+function etiquetaForma(forma: FormaGesto): string {
+  if (forma === 'envolvente') return 'ida y regreso';
+  if (forma === 'loop') return 'bucle';
+  return 'lineal';
+}
+
+function limitar(valor: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, valor));
 }
 
 function descargar(nombre: string, contenido: string, tipo: string): void {

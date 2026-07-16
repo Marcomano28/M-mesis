@@ -69,9 +69,10 @@ export class Cajonera {
       const etiqueta = document.createElement('div');
       etiqueta.style.cssText = 'padding:0 7px 6px;font:10px system-ui;color:#7f7a92';
       const salon = nombresSalon.get(f.salonId) ?? f.salonId;
+      const repertorio = f.gestos?.length ? ` · 🎭 ${f.gestos.length}` : '';
       etiqueta.textContent = f.salonId === 'escenario'
         ? salon
-        : `${salon} · 🧵 ${f.hilos?.length ?? 'anterior'}`;
+        : `${salon} · 🧵 ${f.hilos?.length ?? 'anterior'}${repertorio}`;
 
       const borrar = document.createElement('button');
       borrar.textContent = '✕';

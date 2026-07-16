@@ -1,7 +1,7 @@
 # MIA — Ruta al videoclip interpretado
 ### De una escena reactiva a una toma audiovisual única, reproducible y masterizable
 
-*Versión 1.3 · 15 de julio de 2026 · documento técnico de destino*
+*Versión 1.4 · 16 de julio de 2026 · documento técnico de destino*
 
 Este documento responde una pregunta concreta: **¿puede MIA producir un videoclip musical a partir de una improvisación en tiempo real?**
 
@@ -43,6 +43,7 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 | Actores estáticos/dinámicos | ✅ | Presupuesto de CPU/GPU controlable |
 | Hilos por actor | ✅ | Pose XYZ y expresiones internas direccionables |
 | Hilos seleccionados por ficha | ✅ | Cada camerino exporta solo capacidades elegidas, seguras y etiquetadas |
+| Gestos corporales ensayados | ✅ MVP | El camerino compone lineal, ida/regreso o bucle; el repertorio viaja con la ficha y se acciona por actor |
 | ParamBus base + modulaciones | ✅ | La actuación no destruye la composición original |
 | LFO, ratón, audio básico y MIDI | ✅ MVP | Fuentes reales o simuladas ya pueden tocar los hilos |
 | Acumuladores de frase | ✅ | Primer nivel de memoria temporal |
@@ -54,7 +55,7 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 | Grabación de performance | ⬜ | Falta registrar audio, rasgos, cues y decisiones |
 | Captura audiovisual | ⬜ | Falta grabador, sincronía, codecs y control de carga |
 
-Conclusión: **la marioneta ya tiene hilos y reloj; ahora hay que registrar la interpretación, escribir pistas y filmar la función.**
+Conclusión: **la marioneta ya tiene hilos, un primer repertorio y reloj; ahora la música debe aprender a disparar acciones con intención, registrar la interpretación, escribir pistas y filmar la función.**
 
 ---
 
@@ -172,6 +173,18 @@ interface TomaPerformance {
 - Corregir cualquier contaminación entre IDs antes de serializar rutas.
 
 **Salida:** runtime de actor confiable.
+
+### P0.5 — Repertorio corporal de camerino ✅ MVP
+
+**Objetivo:** que el personaje llegue al escenario con acciones ensayadas, en vez de exponer todos sus parámetros a la música.
+
+- `GestoPersonaje` serializa nombre, forma temporal, curva, duración y canales normalizados.
+- `MotorGestos` aplica el gesto como modulación reversible sobre `ParamBus`, sin alterar la pose base.
+- El camerino crea y prueba repertorio; la ficha lo conserva; cada actor lo resuelve contra su propio ID estable.
+- Formas iniciales: pose lineal, ida y regreso y bucle triangular, con carácter recto o suave.
+- Pendiente inmediato: disparadores musicales semánticos, edición de gestos multicanal, cuantización y prioridades de mezcla.
+
+**Criterio MVP alcanzado:** el gesto viaja de camerino a cajonera y escenario y puede ejecutarse sin afectar la escena global.
 
 ### P1 — DocumentoEscena v3: guardar la coreografía ✅ MVP
 

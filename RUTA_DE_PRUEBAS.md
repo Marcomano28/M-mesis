@@ -1,7 +1,7 @@
 # MIA — Ruta de pruebas
 ### Bitácora viva de validación
 
-*Actualizada el 15 de julio de 2026 · repetir y actualizar después de cada bloque funcional*
+*Actualizada el 16 de julio de 2026 · repetir y actualizar después de cada bloque funcional*
 
 **Reparto:** 🤖 = lo ejecuto yo vía extensión de Chrome (clics, JS, capturas) · 🧑‍🎨 = requiere tu mano/oído
 
@@ -48,6 +48,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P16 | ✅ | Transporte musical compartido | `preparado → reproduciendo → preparado`, avance 00:00→00:01.5 y compás 1·4 a 120 BPM; stop volvió a cero. Una escena restauró 90 BPM, 3 pulsos, 12 s y bucle apagado después de alterarlos |
 | P17 | 🟡 | GLB de Bajo Relieve → ficha → Escenario | El mismo GLB importado debe montar como actor, no volver a `/relieve.glb`; queda pendiente de comprobar con un archivo del usuario |
 | P18 | ✅ | Exposición y color coherentes | Formas, Trazo, Bajo Relieve y Delaunay muestran Alambre/Caras/Ambos; Formas y Delaunay conservan Puntos. Bajo Relieve añade tinte y Trazo conserva fondo/tinta |
+| P19 | ✅ | Gesto de camerino → ficha → actor | Un gesto de ida y regreso sobre respiración apareció en el repertorio del camerino, viajó en “Actor con gesto” y reapareció como botón propio bajo `🎭 Gestos ensayados`; ejecución sin errores. La cajonera muestra ahora `🎭 n` |
 
 **Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
@@ -73,6 +74,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | 15-07-2026 | `main` | DocumentoEscena v3: rutas, LFOs y acumuladores persistentes; limpieza de huérfanos | P14 ✅ en navegador integrado · TypeScript/build ✅ |
 | 15-07-2026 | `main` | Catálogo seguro y selección de hilos exportada con cada ficha | P15 ✅ · selector programático de salón sincronizado · TypeScript/build ✅ |
 | 15-07-2026 | `main` | Transporte común de escena, persistencia y captura atómica de fichas | P16 ✅ en navegador integrado · TypeScript/build ✅ |
+| 16-07-2026 | `main` | Primer ensayo corporal: gestos lineales, envolventes y en bucle guardados por personaje | P19 ✅ en navegador integrado · ficha temporal eliminada · sin errores |
 
 ---
 
@@ -136,11 +138,13 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E15 | Guardar y restaurar una escena con la ficha filtrada | La selección de hilos y las rutas sobreviven dentro de DocumentoEscena v3 |
 | E16 | Preparar/reproducir/detener y restaurar una escena con otro tempo | El reloj avanza por tiempo musical, vuelve a cero y recupera BPM, métrica, duración y bucle |
 | E17 | Importar GLB en Bajo Relieve, guardarlo y añadirlo al Escenario | El actor conserva el binario de la ficha; una carga tardía del modelo por defecto no puede reemplazarlo |
+| E18 | Crear/probar un gesto, guardar ficha y añadir actor al Escenario | El repertorio conserva nombre, forma, curva, duración y canal; el botón del actor mueve solo su parámetro interno |
+| E19 | Duplicar un actor con gesto y accionar solo la copia | Los repertorios son independientes y no hay contaminación entre IDs |
 
 ## Cierre
 
 - Hallazgos → se arreglan en el momento o se anotan aquí con ❌ y ticket en el plan.
-- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3** y P16 cierra el transporte mínimo. El siguiente bloque es registrar eventos con timestamps y reproducirlos sin micrófono.
+- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3**, P16 el transporte mínimo y P19 el repertorio corporal del personaje. El siguiente bloque debe conectar fuentes musicales con **disparadores de gestos nombrados**, no con más parámetros crudos.
 - Después de cada sesión se actualizan estados y se añade una fila al **Registro de rondas**.
 
 ---

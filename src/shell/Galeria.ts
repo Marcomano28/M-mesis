@@ -12,6 +12,7 @@ import { AlmacenFichas, type Ficha } from '../core/Fichas';
 import { crearPanel } from './Paneles';
 import { Cajonera } from './Cajonera';
 import { pedirTexto } from './DialogoTexto';
+import { copiarGestos, type GestoPersonaje, type MotorGestos } from '../core/Gestos';
 
 export class Galeria {
   private activo: Salon | null = null;
@@ -20,6 +21,7 @@ export class Galeria {
   private cajonera: Cajonera;
   private nombresSalon: Map<string, string>;
   private seleccionHilos = new Map<string, Set<string>>();
+  private gestosSalon = new Map<string, GestoPersonaje[]>();
   private escuchasDestinos = new Set<() => void>();
   private selectorPane: Pane | null = null;
   private selectorEstado = { salon: '' };
@@ -28,6 +30,7 @@ export class Galeria {
     private salones: Salon[],
     private engine: Engine,
     private bus: ParamBus,
+    private motorGestos: MotorGestos,
   ) {
     this.nombresSalon = new Map(salones.map((s) => [s.id, s.nombre]));
     this.cajonera = new Cajonera({
@@ -85,6 +88,7 @@ export class Galeria {
 
     try {
       if (this.activo) {
+        this.motorGestos.detenerAmbito(this.ambitoSalon(this.activo.id));
         this.activo.dispose(this.engine.escena);
         this.panel?.dispose();
       }
@@ -117,6 +121,7 @@ export class Galeria {
       catalogoHilosFicha(salon).filter((hilo) => this.obtenerSeleccion(salon).has(hilo.clave)),
     ) : undefined;
     const extra = salon.estadoExtra?.();
+    const gestos = salon.hilosFicha ? copiarGestos(this.obtenerGestos(salon.id)) : undefined;
     const miniatura = await this.engine.capturar();
     const ficha: Ficha = {
       id: crypto.randomUUID(),
@@ -126,6 +131,7 @@ export class Galeria {
       miniatura,
       fecha: Date.now(),
       hilos,
+      gestos,
       extra,
     };
     await this.almacen.guardar(ficha);
@@ -141,6 +147,7 @@ export class Galeria {
     if (salon.hilosFicha) {
       const hilos = ficha.hilos ?? hilosLegadoFicha(salon);
       this.seleccionHilos.set(salon.id, new Set(hilos.map((hilo) => hilo.clave)));
+      this.gestosSalon.set(salon.id, copiarGestos(ficha.gestos));
     }
     // Volcar los parámetros al bus ANTES de construir el panel, que los respeta
     for (const [clave, valor] of Object.entries(ficha.params)) {
@@ -168,6 +175,7 @@ export class Galeria {
 
   private reconstruirPanel(salon: Salon): void {
     const catalogo = catalogoHilosFicha(salon);
+    const gestos = this.obtenerGestos(salon.id);
     this.panel = crearPanel(salon, this.bus, {
       alGuardarFicha: () => { void this.guardarFicha(); },
       hilosFicha: catalogo.length ? {
@@ -175,7 +183,50 @@ export class Galeria {
         seleccion: this.obtenerSeleccion(salon),
         alCambiar: () => this.emitirCambioDestinos(),
       } : undefined,
+      ensayo: salon.hilosFicha ? {
+        gestos,
+        hilos: catalogo.filter((hilo) => hilo.clave.startsWith('param.')),
+        alCrear: (gesto) => {
+          gestos.push(gesto);
+          for (const canal of gesto.canales) this.obtenerSeleccion(salon).add(canal.hilo);
+          this.reconstruirPanelDiferido(salon);
+        },
+        alBorrar: (id) => {
+          const i = gestos.findIndex((gesto) => gesto.id === id);
+          if (i >= 0) gestos.splice(i, 1);
+          this.motorGestos.detenerAmbito(this.ambitoSalon(salon.id));
+          this.reconstruirPanelDiferido(salon);
+        },
+        alProbar: (gesto) => this.motorGestos.reproducir(
+          this.ambitoSalon(salon.id),
+          gesto,
+          (hilo) => hilo.startsWith('param.') ? `${salon.id}.${hilo.slice('param.'.length)}` : null,
+        ),
+        alDetener: () => this.motorGestos.detenerAmbito(this.ambitoSalon(salon.id)),
+      } : undefined,
     });
+  }
+
+  private reconstruirPanelDiferido(salon: Salon): void {
+    queueMicrotask(() => {
+      if (this.activo?.id !== salon.id) return;
+      this.panel?.dispose();
+      this.reconstruirPanel(salon);
+      this.emitirCambioDestinos();
+    });
+  }
+
+  private obtenerGestos(salonId: string): GestoPersonaje[] {
+    let gestos = this.gestosSalon.get(salonId);
+    if (!gestos) {
+      gestos = [];
+      this.gestosSalon.set(salonId, gestos);
+    }
+    return gestos;
+  }
+
+  private ambitoSalon(salonId: string): string {
+    return `salon:${salonId}`;
   }
 
   private obtenerSeleccion(salon: Salon): Set<string> {

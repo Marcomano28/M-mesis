@@ -19,6 +19,7 @@ import { DelaunaySalon } from './salones/delaunay/DelaunaySalon';
 import { EscenarioSalon } from './salones/escenario/EscenarioSalon';
 import { Transporte } from './core/Transporte';
 import { PanelTransporte } from './shell/PanelTransporte';
+import { MotorGestos } from './core/Gestos';
 
 const bus = new ParamBus();
 const engine = new Engine(document.getElementById('lienzo')!);
@@ -41,17 +42,20 @@ const transporte = new Transporte();
 const motorLFO = new MotorLFO(bus);
 const motorAcum = new MotorAcumuladores(bus);
 const motorSinestesia = new MotorSinestesia(bus, transporte);
+const motorGestos = new MotorGestos(bus);
 const escenario = new EscenarioSalon(fabricas, bus, {
   sinestesia: motorSinestesia,
   lfo: motorLFO,
   acumuladores: motorAcum,
   transporte,
+  gestos: motorGestos,
 });
 
 const galeria = new Galeria(
   [new SupershapesSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), escenario],
   engine,
   bus,
+  motorGestos,
 );
 galeria.onCambioDestinos(() => {
   motorSinestesia.refrescarDestinos();
@@ -74,7 +78,7 @@ new PanelSinestesia(motorSinestesia, () => galeria.destinosModulables());
 
 // Acceso de depuración desde la consola
 (window as unknown as Record<string, unknown>).MIA = {
-  engine, bus, galeria, transporte, motorLFO, motorAcum, motorSinestesia,
+  engine, bus, galeria, transporte, motorLFO, motorAcum, motorSinestesia, motorGestos,
 };
 
 let errorLoop = false;
@@ -92,6 +96,7 @@ engine.arrancar((dt, tiempo) => {
     motorLFO.tick(tiempoObra);
     motorAcum.tick(deltaObra, tiempoObra);
     motorSinestesia.tick(deltaObra, tiempoObra, enEscenario ? marco.bpm : 15);
+    motorGestos.tick(deltaObra);
     salon.update(deltaObra, tiempoObra, bus.deSalon(salon.id));
     errorLoop = false;
   } catch (err) {

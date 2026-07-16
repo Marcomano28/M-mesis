@@ -48,6 +48,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 | **El Escenario v3** | ✅ | Actores con ID estable, transform XYZ, visibilidad, duplicación, actividad y actuación persistente |
 | **Hilos individuales** | ✅ | Pose y expresiones seguras direccionadas como `actor:<id>...`; ratón, LFO, memoria y audio pueden actuar por personaje |
 | **Hilos por ficha** | ✅ | Cada salón declara catálogo seguro; el autor exporta solo los elegidos y la cajonera muestra su cantidad |
+| **Repertorio corporal** | ✅ MVP | El camerino ensaya gestos lineales, ida/regreso y bucle; viajan en la ficha y cada actor resuelve sus propios hilos |
 | **Escenas como fichas** | ✅ | ☆ guarda DocumentoEscena, actores y assets GLB de Trazo; clic en la card restaura la puesta |
 | **Export HTML del Escenario** | 🟡 | Reproduce Formas Exóticas y Trazo/GLB con transforms. Delaunay, Relieve, rutas, cámara de obra y runtime musical aún no están unificados |
 | **Moduladores (LFOs)** | ✅ | Base + Σ desplazamientos con clamp; cinco ondas y destinos de salón/actor |
@@ -92,6 +93,7 @@ La música no decoraría una imagen: interpretaría una materia visual. Un ataqu
 - **`recibirFicha()`**: hook opcional del contrato Salon — cualquier salón puede aceptar fichas (hoy solo el Escenario lo implementa).
 - **Actor**: ficha + ID estable + transform XYZ + actividad. Sus hilos usan direcciones `actor:<id>.transform.*` y `actor:<id>.param.*`; las rutas musicales modulan sin destruir la base.
 - **Hilo de ficha**: capacidad local segura (`transform.rotY`, `param.temblor`, etc.) con categoría, coste, escala temporal y afinidades musicales. El ID global solo se asigna al convertir la ficha en actor.
+- **Gesto corporal**: acción nombrada y temporal sobre uno o más hilos internos. La música futura dispara “respirar” o “inclinarse”; no necesita escribir directamente en cada parámetro.
 - **Modos de exposición**: Puntos / Alambre / Caras como atributo estándar (hoy en Formas Exóticas; generalizable vía el tipo `opciones` del ParamDef).
 
 **Lecciones de runtime que ya son reglas del proyecto:**

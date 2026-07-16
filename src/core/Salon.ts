@@ -2,6 +2,7 @@
 // Un salón NUNCA sabe de dónde vienen sus valores (slider, preset, LFO, guitarra).
 
 import type * as THREE from 'three/webgpu';
+import type { GestoPersonaje } from './Gestos';
 
 /** Definición autodescriptiva de un parámetro → genera su control en el panel. */
 export interface ParamDef {
@@ -101,6 +102,8 @@ export interface FichaParaSalon {
   params: Record<string, number>;
   /** Solo estos hilos aparecerán como destinos cuando la ficha sea actor. */
   hilos?: HiloFicha[];
+  /** Repertorio corporal ensayado en el camerino. */
+  gestos?: GestoPersonaje[];
   /** Datos no numéricos de la ficha (por ejemplo, el archivo GLB importado). */
   extra?: unknown;
 }

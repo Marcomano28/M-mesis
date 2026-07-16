@@ -9,6 +9,7 @@ import type { RutaSinestesiaGuardada } from './Sinestesia';
 import type { LFO } from './Moduladores';
 import type { AcumuladorGuardado } from './Acumuladores';
 import { crearConfiguracionTransporte, type ConfiguracionTransporte } from './Transporte';
+import { copiarGestos } from './Gestos';
 
 export type ActividadActor = 'estatico' | 'dinamico';
 
@@ -102,6 +103,7 @@ function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
     nombre: ficha.nombre,
     params: { ...ficha.params },
     hilos: ficha.hilos?.map((hilo) => ({ ...hilo, afinidades: [...hilo.afinidades] })),
+    gestos: copiarGestos(ficha.gestos),
     extra: ficha.extra === undefined ? undefined : structuredClone(ficha.extra),
   };
 }

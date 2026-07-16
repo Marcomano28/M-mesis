@@ -18,6 +18,7 @@ import type { MotorSinestesia } from '../../core/Sinestesia';
 import type { MotorLFO } from '../../core/Moduladores';
 import type { MotorAcumuladores } from '../../core/Acumuladores';
 import type { Transporte } from '../../core/Transporte';
+import { copiarGestos, type MotorGestos } from '../../core/Gestos';
 import {
   crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
   type ActorEscena, type DocumentoEscena,
@@ -37,6 +38,7 @@ interface MotoresActuacion {
   lfo: MotorLFO;
   acumuladores: MotorAcumuladores;
   transporte: Transporte;
+  gestos: MotorGestos;
 }
 
 const TRANSFORM_HILOS = [
@@ -151,6 +153,27 @@ export class EscenarioSalon implements Salon {
       folder.addBinding(t, 'escalaX', { label: 'escala X', min: 0.05, max: 4, step: 0.01 }).on('change', cambioTransform('escalaX'));
       folder.addBinding(t, 'escalaY', { label: 'escala Y', min: 0.05, max: 4, step: 0.01 }).on('change', cambioTransform('escalaY'));
       folder.addBinding(t, 'escalaZ', { label: 'escala Z', min: 0.05, max: 4, step: 0.01 }).on('change', cambioTransform('escalaZ'));
+      if (def.ficha.gestos?.length) {
+        const repertorio = folder.addFolder({ title: '🎭 Gestos ensayados', expanded: false });
+        for (const gesto of def.ficha.gestos) {
+          repertorio.addButton({ title: `▶ ${gesto.nombre}` }).on('click', () => {
+            def.actividad = 'dinamico';
+            folder.refresh();
+            this.motores.gestos.reproducir(
+              this.ambitoActor(def.id),
+              gesto,
+              (hilo) => {
+                if (!hilo.startsWith('param.')) return null;
+                const clave = hilo.slice('param.'.length);
+                return def.ficha.params[clave] === undefined ? null : this.dirParam(def.id, clave);
+              },
+            );
+          });
+        }
+        repertorio.addButton({ title: '■ Detener gesto' }).on('click', () => {
+          this.motores.gestos.detenerAmbito(this.ambitoActor(def.id));
+        });
+      }
       folder.addButton({ title: '⧉ Duplicar actor' }).on('click', () => this.duplicar(def));
       folder.addButton({ title: '✕ Quitar del escenario' }).on('click', () => this.quitar(def));
 
@@ -174,6 +197,7 @@ export class EscenarioSalon implements Salon {
         nombre: `${def.ficha.nombre} copia`,
         params: { ...def.ficha.params },
         hilos: def.ficha.hilos?.map((hilo) => ({ ...hilo, afinidades: [...hilo.afinidades] })),
+        gestos: copiarGestos(def.ficha.gestos),
         extra: def.ficha.extra === undefined ? undefined : structuredClone(def.ficha.extra),
       },
       transform: { ...def.transform, x: def.transform.x + 0.4 },
@@ -192,6 +216,7 @@ export class EscenarioSalon implements Salon {
   }
 
   private desmontar(vivo: ActorVivo): void {
+    this.motores.gestos.detenerAmbito(this.ambitoActor(vivo.def.id));
     try {
       vivo.salon.dispose(vivo.envoltura as unknown as THREE.Scene);
     } catch (err) {
@@ -290,12 +315,17 @@ export class EscenarioSalon implements Salon {
     return `actor:${actorId}.param.${clave}`;
   }
 
+  private ambitoActor(actorId: string): string {
+    return `actor:${actorId}`;
+  }
+
   private esHiloDeEstaEscena(direccion: string): boolean {
     if (direccion.startsWith('escenario.')) return true;
     return this.documento.actores.some((actor) => direccion.startsWith(`actor:${actor.id}.`));
   }
 
   private limpiarRutasActor(actorId: string): void {
+    this.motores.gestos.detenerAmbito(this.ambitoActor(actorId));
     const prefijo = `actor:${actorId}.`;
     this.motores.sinestesia.eliminarDonde((ruta) => ruta.destino.startsWith(prefijo));
     this.motores.lfo.eliminarDonde((lfo) => lfo.destino.startsWith(prefijo));
