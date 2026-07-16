@@ -14,7 +14,7 @@
 
 import * as THREE from 'three/webgpu';
 import {
-  Fn, uniform, uniformArray, attribute, float, vec2, vec3, vec4, int,
+  Fn, uniform, uniformArray, attribute, float, vec3, vec4, int,
   sin, cos, mix, clamp,
 } from 'three/tsl';
 import Delaunator from 'delaunator';
@@ -22,7 +22,8 @@ import type { Salon, Params, ParamDef, HiloFichaDef } from '../../core/Salon';
 
 const MODO = { Lineal: 0, Exponencial: 1 };
 const VISTA = { Puntos: 0, Alambre: 1, Caras: 2, Ambos: 3 };
-const RELLENO_CARAS = { Degradado: 0, 'Fill color': 1 };
+const TRAMA = { Triángulos: 0, 'Celdas Room': 1 };
+const RELLENO_CARAS = { Degradado: 0, 'Room clara': 1 };
 const FIGURA = { Plano: 0, Room: 1 };
 const EXTRUDE = { Fuera: 0, Dentro: 1 };
 // Cara a apagar en la Room (índice en carasCubo) — −1 = ninguna (cubo cerrado).
@@ -49,6 +50,7 @@ export class DelaunaySalon implements Salon {
     { clave: 'puntos',   etiqueta: 'puntos',       valor: 40,     min: 3,   max: 400, paso: 1 },
     { clave: 'semilla',  etiqueta: 'semilla',      valor: 1,      min: 1,   max: 999, paso: 1 },
     { clave: 'figura',   etiqueta: 'figura',       valor: 0,      min: 0,   max: 1,   opciones: FIGURA },
+    { clave: 'trama',    etiqueta: 'trama',        valor: 1,      min: 0,   max: 1,   opciones: TRAMA },
     { clave: 'caraOff',  etiqueta: 'cara apagada', valor: 0,      min: -1,  max: 5,   opciones: CARA },
     { clave: 'anidado',  etiqueta: 'anidado (máx)', valor: 8,     min: 1,   max: 30,  paso: 1 },
     { clave: 'umbral',   etiqueta: 'poda LOD',     valor: 0.05,   min: 0,   max: 0.5 },
@@ -61,9 +63,11 @@ export class DelaunaySalon implements Salon {
     { clave: 'escala',   etiqueta: 'escala global', valor: 2,     min: 0.2, max: 5 },
     { clave: 'color',    etiqueta: 'color',        valor: 0x8ab4ff, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'color2',   etiqueta: 'color 2 (degradado)', valor: 0xff5a8c, min: 0, max: 0xffffff, tipo: 'color' },
-    { clave: 'rellenoCaras', etiqueta: 'relleno caras', valor: 0, min: 0, max: 1, opciones: RELLENO_CARAS },
-    // El verde casi blanco procede del tema claro de Room.js (#f0faec).
-    { clave: 'colorRelleno', etiqueta: 'color fill', valor: 0xf0faec, min: 0, max: 0xffffff, tipo: 'color' },
+    { clave: 'rellenoCaras', etiqueta: 'relleno caras', valor: 1, min: 0, max: 1, opciones: RELLENO_CARAS },
+    // La pareja procede del tema claro de Room.js: la luz no es un color plano,
+    // sino el extremo claro de una escala calculada para cada celda y nivel.
+    { clave: 'colorRelleno', etiqueta: 'luz Room', valor: 0xf0faec, min: 0, max: 0xffffff, tipo: 'color' },
+    { clave: 'colorSombra', etiqueta: 'sombra Room', valor: 0x000000, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'ampDeg',   etiqueta: 'amplitud degradado', valor: 0.7, min: 0, max: 1 },
     { clave: 'puntoTam', etiqueta: 'tamaño punto (export)', valor: 1.5, min: 0.3, max: 6 },
   ];
@@ -77,12 +81,13 @@ export class DelaunaySalon implements Salon {
     sepZ:    uniform(0.03),
     dir:     uniform(1), // +1 extrude hacia afuera, −1 hacia adentro
     ampDeg:  uniform(0.7), // amplitud del degradado color→color2 por nivel
-    rellenoCaras: uniform(0), // 0 = degradado existente, 1 = fill liso elegido por el autor
+    rellenoCaras: uniform(1), // 0 = degradado existente, 1 = paleta procedimental Room
     tiempo:  uniform(0),
   };
   private uColor = uniform(new THREE.Color(0x8ab4ff));
   private uColor2 = uniform(new THREE.Color(0xff5a8c));
   private uColorRelleno = uniform(new THREE.Color(0xf0faec));
+  private uColorSombra = uniform(new THREE.Color(0x000000));
 
   private grupo = new THREE.Group();
   // 3 representaciones compartiendo geometría instanciada y grafo de posición.
@@ -90,6 +95,7 @@ export class DelaunaySalon implements Salon {
   private geo: THREE.InstancedBufferGeometry | null = null;
   // Firma de la última topología horneada (para regenerar solo si cambia)
   private firma = '';
+  private materialRoom: boolean | null = null;
 
   // Caras de despliegue: el shader coloca cada instancia con la matriz de su cara.
   // Se guardan MAX_CARAS slots (identidad de relleno) para un uniformArray fijo;
@@ -102,17 +108,20 @@ export class DelaunaySalon implements Salon {
     const pos = this.nodoPos();
     const color = this.nodoColor();
     const colorCaras = this.nodoColorCaras();
+    const colorAlambre = this.nodoColorAlambre();
     const opac = this.nodoOpacidad();
+    const opacCaras = this.nodoOpacidadCaras();
+    const opacAlambre = this.nodoOpacidadAlambre();
     const geo = this.geoBase();
 
     const matPuntos = new THREE.PointsNodeMaterial({ transparent: true, depthWrite: false });
     matPuntos.positionNode = pos; matPuntos.colorNode = color; matPuntos.opacityNode = opac;
 
     const matAlambre = new THREE.MeshBasicNodeMaterial({ wireframe: true, transparent: true, depthWrite: false });
-    matAlambre.positionNode = pos; matAlambre.colorNode = color; matAlambre.opacityNode = opac;
+    matAlambre.positionNode = pos; matAlambre.colorNode = colorAlambre; matAlambre.opacityNode = opacAlambre;
 
     const matCaras = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, transparent: true, depthWrite: false });
-    matCaras.positionNode = pos; matCaras.colorNode = colorCaras; matCaras.opacityNode = opac;
+    matCaras.positionNode = pos; matCaras.colorNode = colorCaras; matCaras.opacityNode = opacCaras;
 
     this.objs = {
       puntos: new THREE.Points(geo, matPuntos),
@@ -123,6 +132,10 @@ export class DelaunaySalon implements Salon {
       o.frustumCulled = false; // el positionNode reubica los vértices
       this.grupo.add(o);
     }
+    // En la variante Room, el contorno cálido forma parte de las caras, como
+    // en el sketch original; se dibuja por encima de los planos opacos.
+    this.objs.caras.renderOrder = 1;
+    this.objs.alambre.renderOrder = 2;
     escena.add(this.grupo);
     this.firma = ''; // fuerza horneado en el primer update
   }
@@ -133,20 +146,30 @@ export class DelaunaySalon implements Salon {
     const semilla = Math.round(p.semilla ?? 1);
     const niveles = Math.max(1, Math.round(p.anidado ?? 8));
     const figura = p.figura === 1 ? 1 : 0;
+    const trama = p.trama === 0 ? 0 : 1;
     const caraOff = Math.round(p.caraOff ?? -1);
     const umbral = Math.max(0, p.umbral ?? 0.05);
-    const firma = `${figura}|${caraOff}|${umbral.toFixed(3)}|${puntos}|${semilla}|${niveles}`;
+    const firma = `${figura}|${trama}|${caraOff}|${umbral.toFixed(3)}|${puntos}|${semilla}|${niveles}`;
     if (firma !== this.firma) {
       this.firma = firma;
-      this.hornear(figura, caraOff, umbral, puntos, semilla, niveles);
+      this.hornear(figura, trama, caraOff, umbral, puntos, semilla, niveles);
     }
 
     // — Exposición: solo la representación activa es visible —
     const vista = p.vista === 3 ? 3 : p.vista === 2 ? 2 : p.vista === 0 ? 0 : 1;
+    const esRoom = p.rellenoCaras === 1;
     if (this.objs) {
       this.objs.puntos.visible = vista === VISTA.Puntos;
-      this.objs.alambre.visible = vista === VISTA.Alambre || vista === VISTA.Ambos;
+      this.objs.alambre.visible = vista === VISTA.Alambre || vista === VISTA.Ambos || (vista === VISTA.Caras && esRoom);
       this.objs.caras.visible = vista === VISTA.Caras || vista === VISTA.Ambos;
+
+      if (this.materialRoom !== esRoom) {
+        const material = this.objs.caras.material as THREE.MeshBasicNodeMaterial;
+        material.transparent = !esRoom;
+        material.depthWrite = esRoom;
+        material.needsUpdate = true;
+        this.materialRoom = esRoom;
+      }
     }
 
     // — Uniforms —
@@ -156,11 +179,12 @@ export class DelaunaySalon implements Salon {
     this.u.sepZ.value = p.sepZ ?? 0.03;
     this.u.dir.value = p.extrude === 1 ? -1 : 1;
     this.u.ampDeg.value = p.ampDeg ?? 0.7;
-    this.u.rellenoCaras.value = p.rellenoCaras === 1 ? 1 : 0;
+    this.u.rellenoCaras.value = esRoom ? 1 : 0;
     this.u.tiempo.value = tiempo;
     if (p.color !== undefined) this.uColor.value.setHex(p.color);
     if (p.color2 !== undefined) this.uColor2.value.setHex(p.color2);
     if (p.colorRelleno !== undefined) this.uColorRelleno.value.setHex(p.colorRelleno);
+    if (p.colorSombra !== undefined) this.uColorSombra.value.setHex(p.colorSombra);
 
     this.grupo.scale.setScalar(p.escala ?? 2);
   }
@@ -193,75 +217,116 @@ export class DelaunaySalon implements Salon {
 
   /** Recalcula la triangulación (CPU) y hornea los atributos por-instancia.
    *  Los vértices quedan en 2D local; la cara los coloca en 3D en el shader. */
-  private hornear(figura: number, caraOff: number, umbral: number, puntos: number, semilla: number, niveles: number): void {
+  private hornear(figura: number, trama: number, caraOff: number, umbral: number, puntos: number, semilla: number, niveles: number): void {
     const rnd = mulberry32(semilla);
     // Esquinas del plano [-1,1]² → cobertura total; luego puntos aleatorios.
     const xy: number[] = [-1, -1, 1, -1, 1, 1, -1, 1];
     for (let i = 0; i < puntos; i++) xy.push(rnd() * 2 - 1, rnd() * 2 - 1);
 
-    const tri = new Delaunator(xy).triangles; // índices, longitud = 3·nTri
+    const del = new Delaunator(xy);
+    const tri = del.triangles;    // índices, longitud = 3·nTri
+    const half = del.halfedges;   // media-arista opuesta (o −1 en el borde)
     const nTri = tri.length / 3;
 
-    // Matrices de cara → uniformArray (relleno con identidad hasta MAX_CARAS).
-    // La Room omite la cara `caraOff` para poder ver dentro; el plano usa 1.
-    const caras = figura === FIGURA.Room
-      ? carasCubo().filter((_, i) => i !== caraOff)
-      : [new THREE.Matrix4()];
-    const nCaras = caras.length;
-    for (let i = 0; i < MAX_CARAS; i++) this.matCaras[i].copy(caras[i] ?? IDENTIDAD);
+    // — Parches a instanciar —
+    // Un «parche» es el triángulo 2D que replica el anidado, junto con el centro
+    // hacia el que se contrae y el tamaño (perímetro) que decide su LOD y su luz.
+    // · Triángulos: 1 parche por triángulo de Delaunay.
+    // · Celdas Room: el teselado dual del sketch. Cada arista interior compartida
+    //   por dos triángulos genera un cuadrilátero [centroA, u, centroB, v] (los
+    //   centros de ambos triángulos y los extremos u,v de la arista). Ese quad se
+    //   parte en dos parches que comparten centro y tamaño, así el anidado escala
+    //   la celda como una sola pieza (como drawShapeByMeanOffset en Room.js).
+    type Parche = {
+      ax: number; ay: number; bx: number; by: number; cx: number; cy: number;
+      gx: number; gy: number; size: number;
+    };
+    const parches: Parche[] = [];
+    let maxSize = 0;
 
-    // LOD: niveles por triángulo según su tamaño (√área). Grandes → hasta
-    // `niveles`; pequeños → menos, evitando anidar detalle sub-píxel.
-    // `umbral` = tamaño mínimo de copia que vale la pena anidar (0 = sin poda).
-    const lv = new Uint16Array(nTri);
-    let porCara = 0;
-    for (let t = 0; t < nTri; t++) {
-      const a = tri[t * 3], b = tri[t * 3 + 1], d = tri[t * 3 + 2];
-      const area = Math.abs(
-        (xy[b * 2] - xy[a * 2]) * (xy[d * 2 + 1] - xy[a * 2 + 1]) -
-        (xy[d * 2] - xy[a * 2]) * (xy[b * 2 + 1] - xy[a * 2 + 1]),
-      ) * 0.5;
-      lv[t] = umbral > 0
-        ? Math.max(1, Math.min(niveles, Math.round(Math.sqrt(area) / umbral)))
-        : niveles;
-      porCara += lv[t];
-    }
-
-    const N = porCara * nCaras;
-    const iA = new Float32Array(N * 2);
-    const iB = new Float32Array(N * 2);
-    const iC = new Float32Array(N * 2);
-    const iLevel = new Float32Array(N);
-    const iMax = new Float32Array(N);
-    const iFace = new Float32Array(N);
-
-    let k = 0;
-    for (let c = 0; c < nCaras; c++) {
+    if (trama === TRAMA['Celdas Room']) {
+      const cenX = new Float32Array(nTri), cenY = new Float32Array(nTri);
+      for (let t = 0; t < nTri; t++) {
+        const a = tri[t * 3], b = tri[t * 3 + 1], d = tri[t * 3 + 2];
+        cenX[t] = (xy[a * 2] + xy[b * 2] + xy[d * 2]) / 3;
+        cenY[t] = (xy[a * 2 + 1] + xy[b * 2 + 1] + xy[d * 2 + 1]) / 3;
+      }
+      for (let e = 0; e < tri.length; e++) {
+        const opp = half[e];
+        if (opp < 0 || e > opp) continue; // borde (sin celda) o arista ya tratada
+        const tA = (e / 3) | 0, tB = (opp / 3) | 0;
+        const u = tri[e], v = tri[e % 3 === 2 ? e - 2 : e + 1]; // extremos de la arista
+        const gAx = cenX[tA], gAy = cenY[tA], gBx = cenX[tB], gBy = cenY[tB];
+        const ux = xy[u * 2], uy = xy[u * 2 + 1], vx = xy[v * 2], vy = xy[v * 2 + 1];
+        const gx = (gAx + ux + gBx + vx) / 4, gy = (gAy + uy + gBy + vy) / 4;
+        const size = dist(gAx, gAy, ux, uy) + dist(ux, uy, gBx, gBy) +
+                     dist(gBx, gBy, vx, vy) + dist(vx, vy, gAx, gAy);
+        if (size > maxSize) maxSize = size;
+        parches.push({ ax: gAx, ay: gAy, bx: ux, by: uy, cx: gBx, cy: gBy, gx, gy, size });
+        parches.push({ ax: gAx, ay: gAy, bx: gBx, by: gBy, cx: vx, cy: vy, gx, gy, size });
+      }
+    } else {
       for (let t = 0; t < nTri; t++) {
         const a = tri[t * 3], b = tri[t * 3 + 1], d = tri[t * 3 + 2];
         const ax = xy[a * 2], ay = xy[a * 2 + 1];
         const bx = xy[b * 2], by = xy[b * 2 + 1];
         const cx = xy[d * 2], cy = xy[d * 2 + 1];
-        const m = lv[t];
+        const gx = (ax + bx + cx) / 3, gy = (ay + by + cy) / 3;
+        const size = dist(ax, ay, bx, by) + dist(bx, by, cx, cy) + dist(cx, cy, ax, ay);
+        if (size > maxSize) maxSize = size;
+        parches.push({ ax, ay, bx, by, cx, cy, gx, gy, size });
+      }
+    }
+    maxSize = maxSize || 1; // evita /0 con nubes degeneradas
+
+    // Matrices de cara → uniformArray (relleno con identidad hasta MAX_CARAS).
+    // La Room omite la cara `caraOff` para poder ver dentro; el plano usa 1.
+    const caras = figura === FIGURA.Room
+      ? carasCubo().filter((_, i) => i !== caraOff)
+      : [IDENTIDAD];
+    const nCaras = caras.length;
+    for (let i = 0; i < MAX_CARAS; i++) this.matCaras[i].copy(caras[i] ?? IDENTIDAD);
+
+    // LOD: niveles por parche según su tamaño (perímetro). Grandes → hasta
+    // `niveles`; pequeños → menos, evitando anidar detalle sub-píxel.
+    // `umbral` = tamaño mínimo de copia que vale la pena anidar (0 = sin poda).
+    const lv = new Uint16Array(parches.length);
+    let porCara = 0;
+    for (let i = 0; i < parches.length; i++) {
+      lv[i] = umbral > 0
+        ? Math.max(1, Math.min(niveles, Math.round(parches[i].size / (umbral * K_LOD))))
+        : niveles;
+      porCara += lv[i];
+    }
+
+    const N = porCara * nCaras;
+    // Atributos empaquetados en vec4 para no exceder el máximo de 8 vertex buffers
+    // de WebGPU (position + 3 buffers instanciados = 4):
+    //   iAB = [ax, ay, bx, by]           iCG = [cx, cy, centroX, centroY]
+    //   iMeta = [nivel, iMax, cara, tamañoN]
+    const iAB = new Float32Array(N * 4);
+    const iCG = new Float32Array(N * 4);
+    const iMeta = new Float32Array(N * 4);
+
+    let k = 0;
+    for (let c = 0; c < nCaras; c++) {
+      for (let i = 0; i < parches.length; i++) {
+        const P = parches[i];
+        const sizeN = P.size / maxSize; // (0,1] → luz Room
+        const m = lv[i];
         for (let l = 0; l < m; l++) {
-          iA[k * 2] = ax; iA[k * 2 + 1] = ay;
-          iB[k * 2] = bx; iB[k * 2 + 1] = by;
-          iC[k * 2] = cx; iC[k * 2 + 1] = cy;
-          iLevel[k] = l;
-          iMax[k] = m;
-          iFace[k] = c;
+          iAB[k * 4] = P.ax; iAB[k * 4 + 1] = P.ay; iAB[k * 4 + 2] = P.bx; iAB[k * 4 + 3] = P.by;
+          iCG[k * 4] = P.cx; iCG[k * 4 + 1] = P.cy; iCG[k * 4 + 2] = P.gx; iCG[k * 4 + 3] = P.gy;
+          iMeta[k * 4] = l; iMeta[k * 4 + 1] = m; iMeta[k * 4 + 2] = c; iMeta[k * 4 + 3] = sizeN;
           k++;
         }
       }
     }
 
     const geo = this.geoBase();
-    geo.setAttribute('iA', new THREE.InstancedBufferAttribute(iA, 2));
-    geo.setAttribute('iB', new THREE.InstancedBufferAttribute(iB, 2));
-    geo.setAttribute('iC', new THREE.InstancedBufferAttribute(iC, 2));
-    geo.setAttribute('iLevel', new THREE.InstancedBufferAttribute(iLevel, 1));
-    geo.setAttribute('iMax', new THREE.InstancedBufferAttribute(iMax, 1));
-    geo.setAttribute('iFace', new THREE.InstancedBufferAttribute(iFace, 1));
+    geo.setAttribute('iAB', new THREE.InstancedBufferAttribute(iAB, 4));
+    geo.setAttribute('iCG', new THREE.InstancedBufferAttribute(iCG, 4));
+    geo.setAttribute('iMeta', new THREE.InstancedBufferAttribute(iMeta, 4));
     geo.instanceCount = N;
 
     if (this.objs) {
@@ -281,15 +346,18 @@ export class DelaunaySalon implements Salon {
     const u = this.u;
     return Fn(() => {
       const bary = attribute('position', 'vec3'); // reusa position como baricéntrica
-      const A = attribute('iA', 'vec2');
-      const B = attribute('iB', 'vec2');
-      const C = attribute('iC', 'vec2');
-      const level = attribute('iLevel', 'float');
-      const iMax = attribute('iMax', 'float'); // niveles de ESTE triángulo (LOD)
-      const face = attribute('iFace', 'float');
+      const AB = attribute('iAB', 'vec4');
+      const CG = attribute('iCG', 'vec4');
+      const meta = attribute('iMeta', 'vec4');
+      const A = AB.xy, B = AB.zw, C = CG.xy;
+      const level = meta.x;
+      const iMax = meta.y; // niveles de ESTE parche (LOD)
+      const face = meta.z;
 
       const p2 = A.mul(bary.x).add(B.mul(bary.y)).add(C.mul(bary.z));
-      const centro = A.add(B).add(C).div(3);
+      // Centro compartido del parche (centroide del triángulo o de la celda dual):
+      // los sub-triángulos de una misma celda se contraen hacia el mismo punto.
+      const centro = CG.zw;
 
       // Escala del nivel: exponencial 1/(l+1) o lineal 1 − l/iMax (por triángulo).
       const lin = float(1).sub(level.div(iMax));
@@ -312,26 +380,76 @@ export class DelaunaySalon implements Salon {
   private nodoColor(): any {
     const u = this.u;
     return Fn(() => {
-      const level = attribute('iLevel', 'float');
-      const iMax = attribute('iMax', 'float');
+      const meta = attribute('iMeta', 'vec4');
+      const level = meta.x, iMax = meta.y;
       // Degradado a lo largo del anidado (= profundidad del extrude), con amplitud.
       const f = clamp(level.div(iMax), 0, 1).mul(u.ampDeg);
       return mix(this.uColor, this.uColor2, f);
     })();
   }
 
-  /** Las caras pueden conservar el degradado estructural o recibir un fill liso. */
-  private nodoColorCaras(): any {
-    const degradado = this.nodoColor();
-    return Fn(() => mix(degradado, this.uColorRelleno, this.u.rellenoCaras))();
+  /** Escala de la copia (idéntica a la de `nodoPos`): expo 1/(l+1) o lin 1−l/iMax.
+   *  Se recalcula aquí para que la paleta Room comparta el mismo `s` sin atributos. */
+  private nodoS(): any {
+    const meta = attribute('iMeta', 'vec4');
+    const level = meta.x, iMax = meta.y;
+    const lin = float(1).sub(level.div(iMax));
+    const expo = float(1).div(level.add(1));
+    return mix(lin, expo, this.u.modo);
   }
 
+  /** Valor gris procedimental del tema claro de Room (col = lerp(1−s, tam/s, 0.3)):
+   *  crece con lo interno de la copia y con el tamaño de la celda. */
+  private nodoRoomColN(): any {
+    const s = this.nodoS();
+    const size = attribute('iMeta', 'vec4').w;
+    return mix(float(1).sub(s), size.mul(K_VOL).div(s), 0.3);
+  }
+
+  /** Luz de la celda ∈ [0,1] (fill = s − col en Room.js): copias grandes/externas
+   *  tienden a la luz; las internas se hunden a la sombra (los huecos negros). */
+  private nodoRoomFill(): any {
+    return clamp(this.nodoS().sub(this.nodoRoomColN()), 0, 1);
+  }
+
+  /** Caras: degradado estructural (rellenoCaras=0) o la paleta luz/sombra de Room (1). */
+  private nodoColorCaras(): any {
+    const degradado = this.nodoColor();
+    const room = mix(this.uColorSombra, this.uColorRelleno, this.nodoRoomFill());
+    return Fn(() => mix(degradado, room, this.u.rellenoCaras))();
+  }
+
+  /** Alambre: en Room es el contorno cálido translúcido (girishCol del sketch:
+   *  R>G>B), superpuesto a los planos; en degradado, el color estructural normal. */
+  private nodoColorAlambre(): any {
+    const degradado = this.nodoColor();
+    const s = this.nodoS();
+    const c = this.nodoRoomColN();
+    const warm = vec3(
+      clamp(s.mul(0.1).add(c.mul(0.5)), 0, 1),
+      clamp(c.mul(s), 0, 1),
+      clamp(c.mul(s).sub(c.div(3)), 0, 1),
+    );
+    return Fn(() => mix(degradado, warm, this.u.rellenoCaras))();
+  }
+
+  /** Opacidad estructural por nivel (base de puntos, caras y alambre). */
   private nodoOpacidad(): any {
     return Fn(() => {
-      const level = attribute('iLevel', 'float');
-      const iMax = attribute('iMax', 'float');
+      const meta = attribute('iMeta', 'vec4');
+      const level = meta.x, iMax = meta.y;
       return float(1).sub(clamp(level.div(iMax), 0, 1).mul(0.8));
     })();
+  }
+
+  /** Caras: opacas en Room (planos que se ocluyen), degradadas en el modo normal. */
+  private nodoOpacidadCaras(): any {
+    return Fn(() => mix(this.nodoOpacidad(), float(1), this.u.rellenoCaras))();
+  }
+
+  /** Alambre: contorno translúcido (α≈80/255) en Room, degradado en el modo normal. */
+  private nodoOpacidadAlambre(): any {
+    return Fn(() => mix(this.nodoOpacidad(), float(0.32), this.u.rellenoCaras))();
   }
 
   // ————— Exportador (plano 2D autocontenido) —————
@@ -342,6 +460,18 @@ export class DelaunaySalon implements Salon {
 }
 
 const IDENTIDAD = new THREE.Matrix4();
+
+// Perímetro ≈ K_LOD·(tamaño característico): traduce el `umbral` (pensado sobre
+// √área de un triángulo) a la escala del perímetro de un parche.
+const K_LOD = 3;
+// Peso del tamaño de celda en el oscurecimiento de la paleta Room (el `volume/s`
+// del sketch, ya con el tamaño normalizado a (0,1]).
+const K_VOL = 0.8;
+
+/** Distancia euclídea 2D — usada al medir perímetros de parches en el horneado. */
+function dist(x1: number, y1: number, x2: number, y2: number): number {
+  return Math.hypot(x2 - x1, y2 - y1);
+}
 
 /** Las 6 caras de un cubo [-1,1]³: cada matriz lleva el +Z local (donde se apila
  *  el anidado) a la normal exterior de la cara, y la traslada a su centro. */
