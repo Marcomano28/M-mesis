@@ -85,6 +85,19 @@ export class MotorLFO {
     this.emitirCambio();
   }
 
+  /** Conserva un modulador cuyo destino ya no existe, pero lo deja en silencio. */
+  desactivarDonde(predicado: (lfo: LFO) => boolean): number {
+    let total = 0;
+    for (const lfo of this.lfos) {
+      if (!predicado(lfo)) continue;
+      lfo.activo = false;
+      this.bus.limpiarFuente(lfo.id);
+      total++;
+    }
+    if (total) this.emitirCambio();
+    return total;
+  }
+
   private emitirCambio(): void {
     for (const fn of this.escuchasCambio) fn();
   }

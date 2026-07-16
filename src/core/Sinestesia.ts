@@ -167,6 +167,19 @@ export class MotorSinestesia {
     this.emitirCambio();
   }
 
+  /** Conserva una indicación que perdió su hilo, pero evita que siga actuando. */
+  desactivarDonde(predicado: (ruta: RutaSinestesia) => boolean): number {
+    let total = 0;
+    for (const ruta of this.rutas) {
+      if (!predicado(ruta)) continue;
+      ruta.activo = false;
+      this.bus.limpiarFuente(ruta.id);
+      total++;
+    }
+    if (total) this.emitirCambio();
+    return total;
+  }
+
   private emitirCambio(): void {
     for (const fn of this.escuchasCambio) fn();
   }

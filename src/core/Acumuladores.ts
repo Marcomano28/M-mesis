@@ -109,6 +109,19 @@ export class MotorAcumuladores {
     this.emitirCambio();
   }
 
+  /** Conserva una memoria desconectada para poder reasignarla después. */
+  desactivarDonde(predicado: (acumulador: Acumulador) => boolean): number {
+    let total = 0;
+    for (const acumulador of this.acumuladores) {
+      if (!predicado(acumulador)) continue;
+      acumulador.activo = false;
+      this.bus.limpiarFuente(acumulador.id);
+      total++;
+    }
+    if (total) this.emitirCambio();
+    return total;
+  }
+
   private estadoInicial(destino: string): Estado {
     return { anterior: null, maxDeriv: 1e-6, ultimaActividad: 0, interno: 0, destinoPrevio: destino };
   }

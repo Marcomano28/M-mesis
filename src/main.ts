@@ -57,6 +57,9 @@ const galeria = new Galeria(
   bus,
   motorGestos,
 );
+escenario.conectarCamerino((actorId, ficha, alDevolver) => {
+  galeria.iniciarRetoqueActor(actorId, ficha, alDevolver);
+});
 galeria.onCambioDestinos(() => {
   motorSinestesia.refrescarDestinos();
   motorLFO.refrescarDestinos();

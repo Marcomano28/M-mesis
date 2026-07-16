@@ -14,6 +14,12 @@ import { Cajonera } from './Cajonera';
 import { pedirTexto } from './DialogoTexto';
 import { copiarGestos, type GestoPersonaje, type MotorGestos } from '../core/Gestos';
 
+interface SesionRetoqueActor {
+  actorId: string;
+  fichaOriginal: FichaParaSalon;
+  alDevolver: (ficha: FichaParaSalon) => void;
+}
+
 export class Galeria {
   private activo: Salon | null = null;
   private panel: Pane | null = null;
@@ -25,6 +31,7 @@ export class Galeria {
   private escuchasDestinos = new Set<() => void>();
   private selectorPane: Pane | null = null;
   private selectorEstado = { salon: '' };
+  private sesionRetoque: SesionRetoqueActor | null = null;
 
   constructor(
     private salones: Salon[],
@@ -50,6 +57,34 @@ export class Galeria {
 
   get salonActivo(): Salon | null {
     return this.activo;
+  }
+
+  /** Abre en su camerino una copia de un actor que mantiene su lugar en escena. */
+  iniciarRetoqueActor(
+    actorId: string,
+    ficha: FichaParaSalon,
+    alDevolver: (ficha: FichaParaSalon) => void,
+  ): void {
+    const salon = this.salones.find((s) => s.id === ficha.salonId && s.id !== 'escenario');
+    if (!salon?.hilosFicha) {
+      console.error(`No existe un camerino editable para «${ficha.nombre}».`);
+      return;
+    }
+    const hilos = ficha.hilos ?? hilosLegadoFicha(salon);
+    this.seleccionHilos.set(salon.id, new Set(hilos.map((hilo) => hilo.clave)));
+    this.gestosSalon.set(salon.id, copiarGestos(ficha.gestos));
+    for (const [clave, valor] of Object.entries(ficha.params)) {
+      this.bus.set(`${salon.id}.${clave}`, valor);
+    }
+    this.sesionRetoque = { actorId, fichaOriginal: ficha, alDevolver };
+    if (this.activo?.id === salon.id) {
+      this.panel?.dispose();
+      this.reconstruirPanel(salon);
+    } else {
+      this.activar(salon.id);
+    }
+    if (ficha.extra !== undefined) salon.cargarEstadoExtra?.(ficha.extra);
+    this.emitirCambioDestinos();
   }
 
   /** Parámetros modulables del salón activo (para los LFOs): solo sliders numéricos. */
@@ -178,6 +213,11 @@ export class Galeria {
     const gestos = this.obtenerGestos(salon.id);
     this.panel = crearPanel(salon, this.bus, {
       alGuardarFicha: () => { void this.guardarFicha(); },
+      retoqueActor: this.sesionRetoque?.fichaOriginal.salonId === salon.id ? {
+        nombre: this.sesionRetoque.fichaOriginal.nombre,
+        alDevolver: () => this.devolverRetoque(salon),
+        alCancelar: () => this.cancelarRetoque(),
+      } : undefined,
       hilosFicha: catalogo.length ? {
         catalogo,
         seleccion: this.obtenerSeleccion(salon),
@@ -205,6 +245,34 @@ export class Galeria {
         alDetener: () => this.motorGestos.detenerAmbito(this.ambitoSalon(salon.id)),
       } : undefined,
     });
+  }
+
+  private devolverRetoque(salon: Salon): void {
+    const sesion = this.sesionRetoque;
+    if (!sesion || sesion.fichaOriginal.salonId !== salon.id) return;
+    const ficha: FichaParaSalon = {
+      salonId: salon.id,
+      nombre: sesion.fichaOriginal.nombre,
+      params: this.bus.baseDeSalon(salon.id),
+      hilos: materializarHilos(
+        catalogoHilosFicha(salon).filter((hilo) => this.obtenerSeleccion(salon).has(hilo.clave)),
+      ),
+      gestos: copiarGestos(this.obtenerGestos(salon.id)),
+      extra: salon.estadoExtra?.(),
+    };
+    try {
+      sesion.alDevolver(ficha);
+      this.sesionRetoque = null;
+      this.activar('escenario');
+    } catch (err) {
+      console.error(`No se pudo devolver «${ficha.nombre}» al Escenario:`, err);
+    }
+  }
+
+  private cancelarRetoque(): void {
+    if (!this.sesionRetoque) return;
+    this.sesionRetoque = null;
+    this.activar('escenario');
   }
 
   private reconstruirPanelDiferido(salon: Salon): void {

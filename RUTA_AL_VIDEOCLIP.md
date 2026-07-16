@@ -44,6 +44,7 @@ La segunda no debe reinterpretar la música. Debe reproducir las mismas decision
 | Hilos por actor | ✅ | Pose XYZ y expresiones internas direccionables |
 | Hilos seleccionados por ficha | ✅ | Cada camerino exporta solo capacidades elegidas, seguras y etiquetadas |
 | Gestos corporales ensayados | ✅ MVP | El camerino compone lineal, ida/regreso o bucle; el repertorio viaja con la ficha y se acciona por actor |
+| Retorno al camerino | ✅ | El actor conserva ID y puesta; su ficha interna se retoca y remonta. P20/P21 verificados, incluida la protección de indicaciones huérfanas |
 | ParamBus base + modulaciones | ✅ | La actuación no destruye la composición original |
 | LFO, ratón, audio básico y MIDI | ✅ MVP | Fuentes reales o simuladas ya pueden tocar los hilos |
 | Acumuladores de frase | ✅ | Primer nivel de memoria temporal |
@@ -183,6 +184,7 @@ interface TomaPerformance {
 - El camerino crea y prueba repertorio; la ficha lo conserva; cada actor lo resuelve contra su propio ID estable.
 - Formas iniciales: pose lineal, ida y regreso y bucle triangular, con carácter recto o suave.
 - Pendiente inmediato: disparadores musicales semánticos, edición de gestos multicanal, cuantización y prioridades de mezcla.
+- El actor puede volver a su camerino y regresar sobre el mismo ID. Las indicaciones incompatibles se conservan desactivadas para ser reasignadas, no se borran.
 
 **Criterio MVP alcanzado:** el gesto viaja de camerino a cajonera y escenario y puede ejecutarse sin afectar la escena global.
 

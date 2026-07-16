@@ -20,9 +20,15 @@ import type { MotorAcumuladores } from '../../core/Acumuladores';
 import type { Transporte } from '../../core/Transporte';
 import { copiarGestos, type MotorGestos } from '../../core/Gestos';
 import {
-  crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
+  copiarFicha, crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
   type ActorEscena, type DocumentoEscena,
 } from '../../core/DocumentoEscena';
+
+type SolicitarRetoque = (
+  actorId: string,
+  ficha: FichaParaSalon,
+  alDevolver: (ficha: FichaParaSalon) => void,
+) => void;
 
 interface ActorVivo {
   def: ActorEscena;
@@ -72,6 +78,7 @@ export class EscenarioSalon implements Salon {
   private contenedor: HTMLDivElement | null = null;
   /** Invalida colas de montaje pendientes al cambiar o abandonar la escena. */
   private generacionMontaje = 0;
+  private solicitarRetoque: SolicitarRetoque | null = null;
 
   /** fábricas: salonId → instancia ligera preparada para la receta del actor. */
   constructor(
@@ -79,6 +86,10 @@ export class EscenarioSalon implements Salon {
     private bus: ParamBus,
     private motores: MotoresActuacion,
   ) {}
+
+  conectarCamerino(solicitar: SolicitarRetoque): void {
+    this.solicitarRetoque = solicitar;
+  }
 
   init(escena: THREE.Scene, camara: THREE.PerspectiveCamera): void {
     this.escena = escena;
@@ -139,6 +150,10 @@ export class EscenarioSalon implements Salon {
         this.bus.set(this.dirTransform(def.id, clave), t[clave]);
       };
       folder.addBinding(def.ficha, 'nombre', { label: 'nombre' });
+      if (def.avisos?.length) {
+        const estado = { aviso: def.avisos.join(' · ') };
+        folder.addBinding(estado, 'aviso', { label: 'revisión', readonly: true });
+      }
       folder.addBinding(def, 'visible', { label: 'en escena' });
       folder.addBinding(def, 'actividad', {
         label: 'actuación',
@@ -174,6 +189,15 @@ export class EscenarioSalon implements Salon {
           this.motores.gestos.detenerAmbito(this.ambitoActor(def.id));
         });
       }
+      if (this.solicitarRetoque) {
+        folder.addButton({ title: '↩ Retocar en camerino' }).on('click', () => {
+          this.solicitarRetoque?.(
+            def.id,
+            copiarFicha(def.ficha),
+            (ficha) => this.actualizarActorDesdeCamerino(def.id, ficha),
+          );
+        });
+      }
       folder.addButton({ title: '⧉ Duplicar actor' }).on('click', () => this.duplicar(def));
       folder.addButton({ title: '✕ Quitar del escenario' }).on('click', () => this.quitar(def));
 
@@ -201,6 +225,7 @@ export class EscenarioSalon implements Salon {
         extra: def.ficha.extra === undefined ? undefined : structuredClone(def.ficha.extra),
       },
       transform: { ...def.transform, x: def.transform.x + 0.4 },
+      avisos: def.avisos ? [...def.avisos] : undefined,
     };
     this.documento.actores.push(copia);
     if (this.escena) this.montar(copia);
@@ -212,6 +237,43 @@ export class EscenarioSalon implements Salon {
     const vivo = this.vivos.find((v) => v.def.id === def.id);
     if (vivo) this.desmontar(vivo);
     this.vivos = this.vivos.filter((v) => v.def.id !== def.id);
+    this.notificarDestinos();
+  }
+
+  private actualizarActorDesdeCamerino(actorId: string, ficha: FichaParaSalon): void {
+    const def = this.documento.actores.find((actor) => actor.id === actorId);
+    if (!def) throw new Error('El actor ya no pertenece a esta escena.');
+    if (def.ficha.salonId !== ficha.salonId) {
+      throw new Error('El camerino no coincide con la familia del actor.');
+    }
+
+    const permitidas = new Set<string>();
+    for (const hilo of ficha.hilos ?? []) {
+      if (hilo.clave.startsWith('transform.')) {
+        permitidas.add(this.dirTransform(actorId, hilo.clave.slice('transform.'.length)));
+      } else if (hilo.clave.startsWith('param.')) {
+        permitidas.add(this.dirParam(actorId, hilo.clave.slice('param.'.length)));
+      }
+    }
+    const prefijo = `actor:${actorId}.`;
+    const perdida = (direccion: string) => direccion.startsWith(prefijo) && !permitidas.has(direccion);
+    const rutas = this.motores.sinestesia.desactivarDonde((ruta) => perdida(ruta.destino));
+    const lfos = this.motores.lfo.desactivarDonde((lfo) => perdida(lfo.destino));
+    const acumuladores = this.motores.acumuladores.desactivarDonde((a) =>
+      perdida(a.destino) || (a.fuente.startsWith(prefijo) && perdida(a.fuente)));
+    const avisos: string[] = [];
+    if (rutas) avisos.push(`${rutas} ruta${rutas === 1 ? '' : 's'} sin hilo, desactivada${rutas === 1 ? '' : 's'}`);
+    if (lfos) avisos.push(`${lfos} LFO sin hilo, desactivado${lfos === 1 ? '' : 's'}`);
+    if (acumuladores) avisos.push(`${acumuladores} memoria${acumuladores === 1 ? '' : 's'} sin hilo, desactivada${acumuladores === 1 ? '' : 's'}`);
+
+    const vivo = this.vivos.find((actor) => actor.def.id === actorId);
+    if (vivo) {
+      this.desmontar(vivo);
+      this.vivos = this.vivos.filter((actor) => actor !== vivo);
+    }
+    def.ficha = copiarFicha(ficha);
+    def.avisos = avisos.length ? avisos : undefined;
+    if (this.escena) this.montar(def);
     this.notificarDestinos();
   }
 

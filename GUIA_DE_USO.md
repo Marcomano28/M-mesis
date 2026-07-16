@@ -84,6 +84,18 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
 6. Al quitar un actor se eliminan también las rutas, LFOs y acumuladores que lo usan como fuente o destino; así no quedan hilos apuntando a una marioneta inexistente.
 7. En el Escenario los gestos obedecen el reloj de la obra: durante la reproducción avanzan con el transporte; al detenerlo quedan congelados. **■ Detener gesto** retira su modulación y devuelve la pose base.
 
+### Retocar un actor sin desmontar su papel
+
+1. Abre el actor en **🎭 Actores** y pulsa **↩ Retocar en camerino**.
+2. MIA abre su salón con una copia exacta de cuerpo, GLB, materia, hilos y repertorio. La plaza del actor sigue reservada dentro del documento de escena.
+3. Ajusta la figura, cambia el modelo, selecciona hilos o ensaya gestos.
+4. Pulsa **✓ Devolver a escena**. Se conserva el mismo ID de actor, nombre, posición, rotación, escala, visibilidad, actividad y guion escénico; solo se sustituye su ficha interna.
+5. **Cancelar y volver** regresa al Escenario sin aplicar el retoque al actor.
+
+Si se elimina un hilo utilizado por una ruta musical, LFO o memoria, MIA conserva esa indicación pero la deja desactivada. El actor muestra un aviso **revisión** y la indicación puede reasignarse desde su panel correspondiente.
+
+El retoque actualiza la copia del personaje que vive en esa puesta; no sobrescribe silenciosamente la ficha maestra de la cajonera. Si la nueva versión merece convertirse en otra ficha reutilizable, pulsa también **☆ Guardar ficha** mientras está en el camerino.
+
 **Ruta corta:** `🗂 → ➕➕➕ → acomodar en 🎭 → ☆ para congelar la escena`
 
 ---
@@ -182,6 +194,7 @@ Antes de avanzar a cámara y timeline, la ronda mínima es:
 12. En **♫ Transporte**, preparar, reproducir unos segundos y detener: el estado debe pasar por `preparado → reproduciendo → preparado` y volver a cero.
 13. Guardar una escena a 90 BPM, 3 pulsos, 12 s y sin bucle; alterar esos valores y restaurar la ficha: deben volver exactamente los cuatro.
 14. Crear un gesto de ida y regreso en un camerino, guardarlo con la ficha y subirla al Escenario: debe aparecer con su nombre bajo **🎭 Gestos ensayados** y afectar solo a ese actor.
+15. Retocar ese actor desde el Escenario, cambiar un parámetro y devolverlo: debe conservar transform, identidad y guion, pero mostrar la nueva figura.
 
 Esta prueba valida los cimientos y el reloj de la función. La prueba de ópera completa —registro de toma, luces, cámara y coreografía temporal— se añadirá al incorporar esas piezas.
 

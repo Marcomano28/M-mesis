@@ -9,6 +9,11 @@ import type { CurvaGesto, FormaGesto, GestoPersonaje } from '../core/Gestos';
 
 export interface PanelExtras {
   alGuardarFicha?: () => void;
+  retoqueActor?: {
+    nombre: string;
+    alDevolver: () => void;
+    alCancelar: () => void;
+  };
   hilosFicha?: {
     catalogo: HiloFichaDef[];
     seleccion: Set<string>;
@@ -26,6 +31,14 @@ export interface PanelExtras {
 
 export function crearPanel(salon: Salon, bus: ParamBus, extras?: PanelExtras): Pane {
   const pane = new Pane({ title: salon.nombre });
+
+  if (extras?.retoqueActor) {
+    const retoque = pane.addFolder({ title: '↩ Actor en el camerino', expanded: true });
+    const estado = { actor: extras.retoqueActor.nombre };
+    retoque.addBinding(estado, 'actor', { label: 'retocando', readonly: true });
+    retoque.addButton({ title: '✓ Devolver a escena' }).on('click', extras.retoqueActor.alDevolver);
+    retoque.addButton({ title: 'Cancelar y volver' }).on('click', extras.retoqueActor.alCancelar);
+  }
 
   // Estado local espejo, solo para que Tweakpane tenga algo que enlazar.
   const espejo: Record<string, number> = {};

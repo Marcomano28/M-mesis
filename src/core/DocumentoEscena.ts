@@ -32,6 +32,8 @@ export interface ActorEscena {
   visible: boolean;
   actividad: ActividadActor;
   padreId?: string;
+  /** Indicaciones conservadas pero silenciadas tras cambiar los hilos del personaje. */
+  avisos?: string[];
 }
 
 export interface CamaraEscena {
@@ -97,7 +99,7 @@ export function crearActorEscena(ficha: FichaParaSalon): ActorEscena {
   };
 }
 
-function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
+export function copiarFicha(ficha: FichaParaSalon): FichaParaSalon {
   return {
     salonId: ficha.salonId,
     nombre: ficha.nombre,
@@ -155,6 +157,7 @@ export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
         transform: { ...transformActorInicial(), ...a.transform },
         visible: a.visible !== false,
         actividad: a.actividad === 'estatico' ? 'estatico' : 'dinamico',
+        avisos: a.avisos ? [...a.avisos] : undefined,
       })),
       luces: [...(d.luces ?? [])],
       pistas: [...(d.pistas ?? [])],

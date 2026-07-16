@@ -49,6 +49,8 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | P17 | 🟡 | GLB de Bajo Relieve → ficha → Escenario | El mismo GLB importado debe montar como actor, no volver a `/relieve.glb`; queda pendiente de comprobar con un archivo del usuario |
 | P18 | ✅ | Exposición y color coherentes | Formas, Trazo, Bajo Relieve y Delaunay muestran Alambre/Caras/Ambos; Formas y Delaunay conservan Puntos. Bajo Relieve añade tinte y Trazo conserva fondo/tinta |
 | P19 | ✅ | Gesto de camerino → ficha → actor | Un gesto de ida y regreso sobre respiración apareció en el repertorio del camerino, viajó en “Actor con gesto” y reapareció como botón propio bajo `🎭 Gestos ensayados`; ejecución sin errores. La cajonera muestra ahora `🎭 n` |
+| P20 | ✅ | Actor → camerino → mismo actor | “Actor de ida y vuelta” volvió con escala interna 2,60, conservó visibilidad escénica apagada y siguió siendo una sola instancia; cancelar regresó sin aplicar ni producir errores |
+| P21 | ✅ | Indicación que pierde su hilo | La ruta `syn-1 → posición Y` conservó actor/ID, quedó desactivada al retirar el hilo y reapareció como destino guardado; el actor mostró `1 ruta sin hilo, desactivada` |
 
 **Pendientes humanos de esta ronda:** P4 requiere mirar simultáneamente un actor estático y otro dinámico; P7 requiere juzgar si la entrada de diez actores resulta aceptablemente fluida y observar memoria; P9 y P11 requieren abrir el HTML descargado. P10 requiere un GLB del usuario. P13 comprueba visualmente que dos actores escuchan rutas distintas. P6 necesita conservar o proporcionar una ficha de escena v1 real.
 
@@ -75,6 +77,7 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | 15-07-2026 | `main` | Catálogo seguro y selección de hilos exportada con cada ficha | P15 ✅ · selector programático de salón sincronizado · TypeScript/build ✅ |
 | 15-07-2026 | `main` | Transporte común de escena, persistencia y captura atómica de fichas | P16 ✅ en navegador integrado · TypeScript/build ✅ |
 | 16-07-2026 | `main` | Primer ensayo corporal: gestos lineales, envolventes y en bucle guardados por personaje | P19 ✅ en navegador integrado · ficha temporal eliminada · sin errores |
+| 16-07-2026 | `main` | Retorno actor → camerino → mismo lugar escénico y protección de indicaciones huérfanas | P20/P21 ✅ en navegador integrado · actor/ruta/ficha temporales eliminados · sin errores |
 
 ---
 
@@ -140,11 +143,13 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E17 | Importar GLB en Bajo Relieve, guardarlo y añadirlo al Escenario | El actor conserva el binario de la ficha; una carga tardía del modelo por defecto no puede reemplazarlo |
 | E18 | Crear/probar un gesto, guardar ficha y añadir actor al Escenario | El repertorio conserva nombre, forma, curva, duración y canal; el botón del actor mueve solo su parámetro interno |
 | E19 | Duplicar un actor con gesto y accionar solo la copia | Los repertorios son independientes y no hay contaminación entre IDs |
+| E20 | `↩ Retocar en camerino`, modificar y `✓ Devolver a escena` | Se remonta la ficha interna sobre el mismo actor; transform, nombre, visibilidad, actividad y rutas compatibles permanecen |
+| E21 | Retirar durante el retoque un hilo usado por ruta/LFO/memoria | Las indicaciones sobreviven desactivadas, pierden su modulación y el actor muestra un aviso de revisión |
 
 ## Cierre
 
 - Hallazgos → se arreglan en el momento o se anotan aquí con ❌ y ticket en el plan.
-- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3**, P16 el transporte mínimo y P19 el repertorio corporal del personaje. El siguiente bloque debe conectar fuentes musicales con **disparadores de gestos nombrados**, no con más parámetros crudos.
+- P13 sigue siendo la validación humana de dos marionetas con micrófono; P14 cierra técnicamente **DocumentoEscena v3**, P16 el transporte mínimo y P19 el repertorio corporal del personaje. P20/P21 validan que ese personaje pueda madurar sin perder su papel. Después se conectarán fuentes musicales con **disparadores de gestos nombrados**, no con más parámetros crudos.
 - Después de cada sesión se actualizan estados y se añade una fila al **Registro de rondas**.
 
 ---
