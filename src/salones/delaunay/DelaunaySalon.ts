@@ -22,6 +22,7 @@ import type { Salon, Params, ParamDef, HiloFichaDef } from '../../core/Salon';
 
 const MODO = { Lineal: 0, Exponencial: 1 };
 const VISTA = { Puntos: 0, Alambre: 1, Caras: 2, Ambos: 3 };
+const RELLENO_CARAS = { Degradado: 0, 'Fill color': 1 };
 const FIGURA = { Plano: 0, Room: 1 };
 const EXTRUDE = { Fuera: 0, Dentro: 1 };
 // Cara a apagar en la Room (índice en carasCubo) — −1 = ninguna (cubo cerrado).
@@ -60,6 +61,9 @@ export class DelaunaySalon implements Salon {
     { clave: 'escala',   etiqueta: 'escala global', valor: 2,     min: 0.2, max: 5 },
     { clave: 'color',    etiqueta: 'color',        valor: 0x8ab4ff, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'color2',   etiqueta: 'color 2 (degradado)', valor: 0xff5a8c, min: 0, max: 0xffffff, tipo: 'color' },
+    { clave: 'rellenoCaras', etiqueta: 'relleno caras', valor: 0, min: 0, max: 1, opciones: RELLENO_CARAS },
+    // El verde casi blanco procede del tema claro de Room.js (#f0faec).
+    { clave: 'colorRelleno', etiqueta: 'color fill', valor: 0xf0faec, min: 0, max: 0xffffff, tipo: 'color' },
     { clave: 'ampDeg',   etiqueta: 'amplitud degradado', valor: 0.7, min: 0, max: 1 },
     { clave: 'puntoTam', etiqueta: 'tamaño punto (export)', valor: 1.5, min: 0.3, max: 6 },
   ];
@@ -73,10 +77,12 @@ export class DelaunaySalon implements Salon {
     sepZ:    uniform(0.03),
     dir:     uniform(1), // +1 extrude hacia afuera, −1 hacia adentro
     ampDeg:  uniform(0.7), // amplitud del degradado color→color2 por nivel
+    rellenoCaras: uniform(0), // 0 = degradado existente, 1 = fill liso elegido por el autor
     tiempo:  uniform(0),
   };
   private uColor = uniform(new THREE.Color(0x8ab4ff));
   private uColor2 = uniform(new THREE.Color(0xff5a8c));
+  private uColorRelleno = uniform(new THREE.Color(0xf0faec));
 
   private grupo = new THREE.Group();
   // 3 representaciones compartiendo geometría instanciada y grafo de posición.
@@ -95,6 +101,7 @@ export class DelaunaySalon implements Salon {
     // Grafos TSL compartidos por las tres representaciones.
     const pos = this.nodoPos();
     const color = this.nodoColor();
+    const colorCaras = this.nodoColorCaras();
     const opac = this.nodoOpacidad();
     const geo = this.geoBase();
 
@@ -105,7 +112,7 @@ export class DelaunaySalon implements Salon {
     matAlambre.positionNode = pos; matAlambre.colorNode = color; matAlambre.opacityNode = opac;
 
     const matCaras = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide, transparent: true, depthWrite: false });
-    matCaras.positionNode = pos; matCaras.colorNode = color; matCaras.opacityNode = opac;
+    matCaras.positionNode = pos; matCaras.colorNode = colorCaras; matCaras.opacityNode = opac;
 
     this.objs = {
       puntos: new THREE.Points(geo, matPuntos),
@@ -149,9 +156,11 @@ export class DelaunaySalon implements Salon {
     this.u.sepZ.value = p.sepZ ?? 0.03;
     this.u.dir.value = p.extrude === 1 ? -1 : 1;
     this.u.ampDeg.value = p.ampDeg ?? 0.7;
+    this.u.rellenoCaras.value = p.rellenoCaras === 1 ? 1 : 0;
     this.u.tiempo.value = tiempo;
     if (p.color !== undefined) this.uColor.value.setHex(p.color);
     if (p.color2 !== undefined) this.uColor2.value.setHex(p.color2);
+    if (p.colorRelleno !== undefined) this.uColorRelleno.value.setHex(p.colorRelleno);
 
     this.grupo.scale.setScalar(p.escala ?? 2);
   }
@@ -309,6 +318,12 @@ export class DelaunaySalon implements Salon {
       const f = clamp(level.div(iMax), 0, 1).mul(u.ampDeg);
       return mix(this.uColor, this.uColor2, f);
     })();
+  }
+
+  /** Las caras pueden conservar el degradado estructural o recibir un fill liso. */
+  private nodoColorCaras(): any {
+    const degradado = this.nodoColor();
+    return Fn(() => mix(degradado, this.uColorRelleno, this.u.rellenoCaras))();
   }
 
   private nodoOpacidad(): any {
