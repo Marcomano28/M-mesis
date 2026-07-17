@@ -577,6 +577,8 @@ function crearSerpiente(P){
     return new THREE.Vector3(r*r1*Math.cos(th+TRN)-(1-p)**2*500+200, r*r2*Math.sin(th+TRN)+100*Math.sin(Math.PI*2*p), -Z*(1-p)+50*Math.sin(Math.PI*2*p)+120); };
   const inst=[]; for(let i=0;i<N1;i++)for(let j=0;j<N;j++) inst.push({seed:10+Math.random()*990,off:0.4+0.8*(Math.random()*2-1),di:120+Math.random()*680,i,j});
   const V=N1*N*K*4*3, posArr=new Float32Array(V*3), colArr=new Float32Array(V*3);
+  const LUZ=new THREE.Color(P.sColorLuz??0xdfe6ff), SOM=new THREE.Color(P.sColorSombra??0x000000);
+  const AMP=P.sAmpNoise??1, ALAM=new THREE.Color(P.sColorAlambre??0xdfe6ff), vista=P.vista??2;
   function build(t){ let idx=0;
     for(const {seed,off,di,i,j} of inst){ for(let k=0;k<K;k++){ const ind=j+(t+k)*N;
       const p0=mapV(ind+0.5,0,N2,MV,MXV),p1=mapV(ind,0,N2,MV,MXV),p2=mapV(ind+1,0,N2,MV,MXV);
@@ -584,18 +586,28 @@ function crearSerpiente(P){
       const par=(1-cl(2*p0-off,0,1))**3.3, rn=mapV(noise2D(seed+2*p0,0),-1,1,0,1), rV=R-20-180*rn**5, d=di*par, q=cl(par+0.05,0,1);
       const v0=pos(rV+d,p0,th0), v1=pos(R+d,p1,th1).lerp(v0,q), v2=pos(R+d,p2,th1).lerp(v0,q), v3=pos(R+d,p2,th2).lerp(v0,q), v4=pos(R+d,p1,th2).lerp(v0,q);
       const ca=900*mapV(noise2D(2*seed+2.5*p0,0),-1,1,0,1)**8, cb2=200*mapV(noise2D(2*seed+9.5*p0,0),-1,1,0,1)**6;
-      const br=cl((5+0.2*ca+0.8*cb2-(1-p0)*130)/255,0,1);
+      const br=cl((5+AMP*(0.2*ca+0.8*cb2)-(1-p0)*130)/255,0,1);
       for(const [a,b,c] of [[v0,v1,v2],[v0,v3,v2],[v0,v3,v4],[v0,v1,v4]]) for(const v of [a,b,c]){
         posArr[idx*3]=v.x*SC; posArr[idx*3+1]=v.y*SC; posArr[idx*3+2]=v.z*SC;
-        colArr[idx*3]=br; colArr[idx*3+1]=br*1.05; colArr[idx*3+2]=br*0.75; idx++; }
+        colArr[idx*3]=SOM.r+(LUZ.r-SOM.r)*br; colArr[idx*3+1]=SOM.g+(LUZ.g-SOM.g)*br*1.05; colArr[idx*3+2]=SOM.b+(LUZ.b-SOM.b)*br*0.75; idx++; }
     }}
   }
   build(P.fase??0);
   const geo=new THREE.BufferGeometry();
   geo.setAttribute('position',new THREE.BufferAttribute(posArr,3));
   geo.setAttribute('color',new THREE.BufferAttribute(colArr,3));
-  const cuerpo=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
-  cuerpo.rotation.set(Math.PI*0.9,Math.PI*0.65,0); cuerpo.frustumCulled=false;
+  const baryArr=new Float32Array(V*3); for(let i=0;i<V;i++) baryArr[i*3+i%3]=1;
+  geo.setAttribute('aBary',new THREE.BufferAttribute(baryArr,3));
+  const caras=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
+  const alambre=new THREE.Mesh(geo,new THREE.ShaderMaterial({transparent:true,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,
+    uniforms:{col:{value:ALAM},g:{value:P.sGrosor??0.06}},
+    vertexShader:'attribute vec3 aBary; varying vec3 vB; void main(){vB=aBary;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader:'uniform vec3 col; uniform float g; varying vec3 vB; void main(){float m=min(vB.x,min(vB.y,vB.z));float w=(1.0-smoothstep(g*0.5,g,m))*0.5;if(w<0.01)discard;gl_FragColor=vec4(col,w);}'}));
+  const puntos=new THREE.Points(geo,new THREE.PointsMaterial({color:ALAM,size:0.02,sizeAttenuation:true}));
+  caras.visible=vista===2||vista===3; alambre.visible=vista===1||vista===3; puntos.visible=vista===0;
+  const cuerpo=new THREE.Group(); cuerpo.add(caras,alambre,puntos);
+  cuerpo.rotation.set(Math.PI*0.9,Math.PI*0.65,0);
+  for(const o of cuerpo.children) o.frustumCulled=false;
   const figura=new THREE.Group(); figura.add(cuerpo); figura.scale.setScalar(P.escala??2);
   let fase=P.fase??0;
   const tick=(T,dt)=>{ fase+=dt*(P.velocidad??0.3); build(fase);

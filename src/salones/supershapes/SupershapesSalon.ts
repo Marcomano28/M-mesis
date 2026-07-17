@@ -16,8 +16,8 @@
 
 import * as THREE from 'three/webgpu';
 import {
-  Fn, uniform, float, vec3, vec4, uv, mix, abs, sin, cos, exp, max,
-  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute, mx_noise_float, fract,
+  Fn, uniform, float, vec3, vec4, uv, mix, abs, sin, cos, exp, max, min,
+  clamp, select, normalize, cross, dot, faceDirection, modelWorldMatrix, attribute, mx_noise_float, fract, smoothstep,
 } from 'three/tsl';
 import type { Salon, Params, ParamDef, Pestana, HiloFichaDef } from '../../core/Salon';
 
@@ -118,6 +118,15 @@ export class SupershapesSalon implements Salon {
         { clave: 'sr2n1', etiqueta: 'r2 · n1', valor: 0.3, min: 0.01, max: 5 },
         { clave: 'sr2n2', etiqueta: 'r2 · n2', valor: 0.5, min: 0.01, max: 5 },
         { clave: 'sr2n3', etiqueta: 'r2 · n3', valor: 0.5, min: 0.01, max: 5 },
+        // — Piel: el brillo por noise degrada sombra→luz; la amplitud regula
+        //   cuánto pesa el noise en ese brillo. Defaults = aspecto anterior.
+        { clave: 'sColorLuz',    etiqueta: 'caras · luz',    valor: 0xdfe6ff, min: 0, max: 0xffffff, tipo: 'color' },
+        { clave: 'sColorSombra', etiqueta: 'caras · sombra', valor: 0x000000, min: 0, max: 0xffffff, tipo: 'color' },
+        { clave: 'sAmpNoise',    etiqueta: 'amplitud noise', valor: 1,        min: 0, max: 3 },
+        { clave: 'sColorAlambre', etiqueta: 'alambre',       valor: 0xdfe6ff, min: 0, max: 0xffffff, tipo: 'color' },
+        // Grosor en coordenadas baricéntricas (fracción del triángulo, como el
+        // grosor de CrossHatch): las líneas GPU nativas son de 1px fijo.
+        { clave: 'sGrosor',      etiqueta: 'grosor alambre', valor: 0.06,     min: 0.01, max: 0.3 },
       ],
     },
     {
@@ -160,7 +169,12 @@ export class SupershapesSalon implements Salon {
     N1: uniform(30), N: uniform(12), N2: uniform(80),
     r1m: uniform(5), r1n1: uniform(0.1), r1n2: uniform(1.7), r1n3: uniform(1.7),
     r2m: uniform(7), r2n1: uniform(0.3), r2n2: uniform(0.5), r2n3: uniform(0.5),
+    ampNoise: uniform(1), grosorAlambre: uniform(0.06),
   };
+  // Piel de la Serpiente: el brillo (noise) degrada sombra→luz; alambre/puntos, plano.
+  private uSerpLuz = uniform(new THREE.Color(0xdfe6ff));
+  private uSerpSombra = uniform(new THREE.Color(0x000000));
+  private uSerpAlambre = uniform(new THREE.Color(0xdfe6ff));
   private uColor = uniform(new THREE.Color(0xdfe6ff));
 
   private grupo = new THREE.Group();
@@ -772,11 +786,18 @@ export class SupershapesSalon implements Salon {
 
     const matPuntos = new THREE.PointsNodeMaterial();
     matPuntos.positionNode = pos;
-    matPuntos.colorNode = this.uColor;
+    matPuntos.colorNode = this.uSerpAlambre;
 
-    const matAlambre = new THREE.MeshBasicNodeMaterial({ wireframe: true, transparent: true, opacity: 0.5 });
+    // Alambre por shader (máscara baricéntrica, como el grosor de CrossHatch):
+    // las líneas GPU nativas son de 1px fijo y no admiten grosor. polygonOffset
+    // lo adelanta para que no pelee en Z con las caras en la vista «Ambos».
+    const matAlambre = new THREE.MeshBasicNodeMaterial({
+      transparent: true, side: THREE.DoubleSide, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1,
+    });
     matAlambre.positionNode = pos;
-    matAlambre.colorNode = this.uColor;
+    matAlambre.colorNode = this.uSerpAlambre;
+    matAlambre.opacityNode = this.nodoAlambreSerp().mul(0.5);
 
     const matCaras = new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide });
     matCaras.positionNode = pos;
@@ -806,6 +827,10 @@ export class SupershapesSalon implements Salon {
     const position = new Float32Array(verts * 3); // dummy: positionNode lo sobreescribe
     const aIJK = new Float32Array(verts * 3);     // (i, j, k)
     const aInst = new Float32Array(verts * 4);    // (esquina 0..4, seed, off, di)
+    // Baricéntrica por vértice para el alambre por shader: v0=A, v1/v3=B, v2/v4=C
+    // → cada triángulo de TRI recibe las 3 esquinas distintas pese al reuso.
+    const aBary = new Float32Array(verts * 3);
+    const BARY = [0, 1, 2, 1, 2]; // esquina → canal encendido
     const idx = new Uint32Array(celdas * TRI.length);
     let vi = 0, ii = 0;
     for (let i = 0; i < N1; i++) {
@@ -818,6 +843,7 @@ export class SupershapesSalon implements Salon {
           for (let esquina = 0; esquina < 5; esquina++) {
             aIJK[vi * 3] = i; aIJK[vi * 3 + 1] = j; aIJK[vi * 3 + 2] = k;
             aInst[vi * 4] = esquina; aInst[vi * 4 + 1] = seed; aInst[vi * 4 + 2] = off; aInst[vi * 4 + 3] = di;
+            aBary[vi * 3 + BARY[esquina]] = 1;
             vi++;
           }
           for (const local of TRI) idx[ii++] = base + local;
@@ -828,6 +854,7 @@ export class SupershapesSalon implements Salon {
     geo.setAttribute('position', new THREE.BufferAttribute(position, 3));
     geo.setAttribute('aIJK', new THREE.BufferAttribute(aIJK, 3));
     geo.setAttribute('aInst', new THREE.BufferAttribute(aInst, 4));
+    geo.setAttribute('aBary', new THREE.BufferAttribute(aBary, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 20); // el shader mueve todo: cota amplia
     this.geoS = geo;
@@ -857,6 +884,11 @@ export class SupershapesSalon implements Salon {
     u.N1.value = N1; u.N.value = N; u.N2.value = N2;
     u.r1m.value = p.sr1m ?? 5; u.r1n1.value = p.sr1n1 ?? 0.1; u.r1n2.value = p.sr1n2 ?? 1.7; u.r1n3.value = p.sr1n3 ?? 1.7;
     u.r2m.value = p.sr2m ?? 7; u.r2n1.value = p.sr2n1 ?? 0.3; u.r2n2.value = p.sr2n2 ?? 0.5; u.r2n3.value = p.sr2n3 ?? 0.5;
+    u.ampNoise.value = p.sAmpNoise ?? 1;
+    u.grosorAlambre.value = p.sGrosor ?? 0.06;
+    this.uSerpLuz.value.setHex(p.sColorLuz ?? 0xdfe6ff);
+    this.uSerpSombra.value.setHex(p.sColorSombra ?? 0x000000);
+    this.uSerpAlambre.value.setHex(p.sColorAlambre ?? 0xdfe6ff);
   }
 
   // ————— Grafos TSL de la Serpiente —————
@@ -917,6 +949,16 @@ export class SupershapesSalon implements Salon {
     })();
   }
 
+  /** Máscara de borde ∈ [0,1]: 1 sobre las aristas del triángulo, 0 en el interior.
+   *  `grosorAlambre` = distancia baricéntrica donde la línea se desvanece. */
+  private nodoAlambreSerp(): any {
+    return Fn(() => {
+      const b = attribute('aBary', 'vec3');
+      const m = min(b.x, min(b.y, b.z));
+      return smoothstep(this.uS.grosorAlambre.mul(0.5), this.uS.grosorAlambre, m).oneMinus();
+    })();
+  }
+
   private nodoColorSerp(): any {
     const u = this.uS;
     return Fn(() => {
@@ -927,10 +969,14 @@ export class SupershapesSalon implements Salon {
       const p0 = u.MV.add(ind.add(0.5).div(u.N2).mul(u.MXV.sub(u.MV)));
       const coladd = this.snoise01(seed.mul(2).add(p0.mul(2.5))).pow(8).mul(900);
       const coladd2 = this.snoise01(seed.mul(2).add(p0.mul(9.5))).pow(6).mul(200);
+      // ampNoise regula el peso del noise en el brillo; el brillo (con el tinte
+      // cálido 1/1.05/0.75 por canal) degrada sombra→luz elegidas por el autor.
+      const noise = coladd.mul(0.2).add(coladd2.mul(0.8)).mul(u.ampNoise);
       const bright = clamp(
-        float(5).add(coladd.mul(0.2)).add(coladd2.mul(0.8)).sub(float(1).sub(p0).mul(130)).div(255),
+        float(5).add(noise).sub(float(1).sub(p0).mul(130)).div(255),
         0, 1);
-      return vec3(bright, bright.mul(1.05), bright.mul(0.75)).mul(this.uColor);
+      const brv = vec3(bright, bright.mul(1.05), bright.mul(0.75));
+      return mix(this.uSerpSombra, this.uSerpLuz, brv);
     })();
   }
 
@@ -1223,6 +1269,8 @@ function pos(r,p,th){ const r1=sup(th,R1[0],R1[1],R1[2],R1[3]),r2=sup(th,R2[0],R
   return new THREE.Vector3(r*r1*Math.cos(th+TRN)-(1-p)**2*500+200, r*r2*Math.sin(th+TRN)+100*Math.sin(Math.PI*2*p), -Z*(1-p)+50*Math.sin(Math.PI*2*p)+120); }
 const inst=[]; for(let i=0;i<N1;i++)for(let j=0;j<N;j++) inst.push({seed:10+Math.random()*990,off:0.4+0.8*(Math.random()*2-1),di:120+Math.random()*680,i,j});
 const V = N1*N*K*4*3, posArr = new Float32Array(V*3), colArr = new Float32Array(V*3);
+const LUZ=new THREE.Color(P.sColorLuz??0xdfe6ff), SOM=new THREE.Color(P.sColorSombra??0x000000);
+const AMP=P.sAmpNoise??1, ALAM=new THREE.Color(P.sColorAlambre??0xdfe6ff), vista=P.vista??2;
 function build(t){ let idx=0;
   for(const {seed,off,di,i,j} of inst){ for(let k=0;k<K;k++){ const ind=j+(t+k)*N;
     const p0=mapV(ind+0.5,0,N2,MV,MXV),p1=mapV(ind,0,N2,MV,MXV),p2=mapV(ind+1,0,N2,MV,MXV);
@@ -1230,18 +1278,27 @@ function build(t){ let idx=0;
     const par=(1-clamp(2*p0-off,0,1))**3.3, rn=mapV(noise2D(seed+2*p0,0),-1,1,0,1), rV=R-20-180*rn**5, d=di*par, q=clamp(par+0.05,0,1);
     const v0=pos(rV+d,p0,th0), v1=pos(R+d,p1,th1).lerp(v0,q), v2=pos(R+d,p2,th1).lerp(v0,q), v3=pos(R+d,p2,th2).lerp(v0,q), v4=pos(R+d,p1,th2).lerp(v0,q);
     const ca=900*mapV(noise2D(2*seed+2.5*p0,0),-1,1,0,1)**8, cb2=200*mapV(noise2D(2*seed+9.5*p0,0),-1,1,0,1)**6;
-    const br=clamp((5+0.2*ca+0.8*cb2-(1-p0)*130)/255,0,1);
+    const br=clamp((5+AMP*(0.2*ca+0.8*cb2)-(1-p0)*130)/255,0,1);
     for(const [a,b,c] of [[v0,v1,v2],[v0,v3,v2],[v0,v3,v4],[v0,v1,v4]]) for(const v of [a,b,c]){
       posArr[idx*3]=v.x*SC; posArr[idx*3+1]=v.y*SC; posArr[idx*3+2]=v.z*SC;
-      colArr[idx*3]=br; colArr[idx*3+1]=br*1.05; colArr[idx*3+2]=br*0.75; idx++; }
+      colArr[idx*3]=SOM.r+(LUZ.r-SOM.r)*br; colArr[idx*3+1]=SOM.g+(LUZ.g-SOM.g)*br*1.05; colArr[idx*3+2]=SOM.b+(LUZ.b-SOM.b)*br*0.75; idx++; }
   }}
 }
 const geo=new THREE.BufferGeometry();
 geo.setAttribute('position',new THREE.BufferAttribute(posArr,3));
 geo.setAttribute('color',new THREE.BufferAttribute(colArr,3));
+const baryArr=new Float32Array(V*3); for(let i=0;i<V;i++) baryArr[i*3+i%3]=1;
+geo.setAttribute('aBary',new THREE.BufferAttribute(baryArr,3));
 const malla=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
-malla.rotation.set(Math.PI*0.9,Math.PI*0.65,0);
-const grupo=new THREE.Group(); grupo.add(malla); grupo.scale.setScalar(P.escala);
+const alambre=new THREE.Mesh(geo,new THREE.ShaderMaterial({transparent:true,side:THREE.DoubleSide,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,
+  uniforms:{col:{value:ALAM},g:{value:P.sGrosor??0.06}},
+  vertexShader:'attribute vec3 aBary; varying vec3 vB; void main(){vB=aBary;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'uniform vec3 col; uniform float g; varying vec3 vB; void main(){float m=min(vB.x,min(vB.y,vB.z));float w=(1.0-smoothstep(g*0.5,g,m))*0.5;if(w<0.01)discard;gl_FragColor=vec4(col,w);}'}));
+const puntos=new THREE.Points(geo,new THREE.PointsMaterial({color:ALAM,size:0.02,sizeAttenuation:true}));
+malla.visible=vista===2||vista===3; alambre.visible=vista===1||vista===3; puntos.visible=vista===0;
+const cuerpo=new THREE.Group(); cuerpo.add(malla,alambre,puntos);
+cuerpo.rotation.set(Math.PI*0.9,Math.PI*0.65,0);
+const grupo=new THREE.Group(); grupo.add(cuerpo); grupo.scale.setScalar(P.escala);
 const escena=new THREE.Scene(); escena.add(grupo);
 const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,100); cam.position.z=6;
 const r=new THREE.WebGLRenderer({antialias:true}); r.setSize(innerWidth,innerHeight); r.setPixelRatio(Math.min(devicePixelRatio,2));
