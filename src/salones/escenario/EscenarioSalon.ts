@@ -19,6 +19,9 @@ import type { MotorLFO } from '../../core/Moduladores';
 import type { MotorAcumuladores } from '../../core/Acumuladores';
 import type { Transporte } from '../../core/Transporte';
 import { copiarGestos, type MotorGestos } from '../../core/Gestos';
+import type { MotorBarniz } from '../../core/Barniz';
+import type { MotorNarrador } from '../../core/Narrador';
+import type { MotorSemilla } from '../../core/Semilla';
 import {
   copiarFicha, crearActorEscena, crearDocumentoEscena, migrarDocumentoEscena,
   type ActorEscena, type DocumentoEscena,
@@ -45,6 +48,9 @@ interface MotoresActuacion {
   acumuladores: MotorAcumuladores;
   transporte: Transporte;
   gestos: MotorGestos;
+  barniz: MotorBarniz;
+  narrador: MotorNarrador;
+  semilla: MotorSemilla;
 }
 
 const TRANSFORM_HILOS = [
@@ -431,6 +437,10 @@ export class EscenarioSalon implements Salon {
       rutas: this.motores.sinestesia.exportar((ruta) => this.esHiloDeEstaEscena(ruta.destino)),
       lfos: this.motores.lfo.exportar((lfo) => this.esHiloDeEstaEscena(lfo.destino)),
       acumuladores: this.motores.acumuladores.exportar((a) => this.esHiloDeEstaEscena(a.destino)),
+      barniz: this.motores.barniz.exportar(),
+      barnizActivo: this.motores.barniz.activo,
+      narrador: this.motores.narrador.exportar(),
+      semilla: this.motores.semilla.exportar(),
     };
     return structuredClone(this.documento);
   }
@@ -448,6 +458,11 @@ export class EscenarioSalon implements Salon {
     this.motores.sinestesia.restaurar(documento.actuacion.rutas);
     this.motores.lfo.restaurar(documento.actuacion.lfos);
     this.motores.acumuladores.restaurar(documento.actuacion.acumuladores);
+    this.motores.barniz.restaurar(documento.actuacion.barniz ?? null);
+    if (documento.actuacion.barnizActivo) this.motores.barniz.encender();
+    else this.motores.barniz.apagar();
+    this.motores.narrador.restaurar(documento.actuacion.narrador ?? null);
+    this.motores.semilla.restaurar(documento.actuacion.semilla ?? null);
     this.camara.position.fromArray(documento.camara.posicion);
     this.camara.fov = documento.camara.fov;
     this.camara.lookAt(...documento.camara.objetivo);

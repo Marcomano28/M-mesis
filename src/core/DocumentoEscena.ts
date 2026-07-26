@@ -8,6 +8,9 @@ import type { FichaParaSalon } from './Salon';
 import type { RutaSinestesiaGuardada } from './Sinestesia';
 import type { LFO } from './Moduladores';
 import type { AcumuladorGuardado } from './Acumuladores';
+import type { FichaBarniz } from './Barniz';
+import type { NarradorGuardado } from './Narrador';
+import type { SemillaGuardada } from './Semilla';
 import { crearConfiguracionTransporte, type ConfiguracionTransporte } from './Transporte';
 import { copiarGestos } from './Gestos';
 
@@ -53,6 +56,13 @@ export interface ActuacionEscena {
   rutas: RutaSinestesiaGuardada[];
   lfos: LFO[];
   acumuladores: AcumuladorGuardado[];
+  /** El paisaje de coherencia (biblia, Anexo I). Opcional: escenas viejas no lo traen. */
+  barniz?: FichaBarniz | null;
+  barnizActivo?: boolean;
+  /** El Narrador (Etapa 7): repertorio, umbrales y estado. Opcional. */
+  narrador?: NarradorGuardado | null;
+  /** La Semilla (Etapa 3): ejes de manifestación, modo y protocolo. Opcional. */
+  semilla?: SemillaGuardada | null;
 }
 
 export interface DocumentoEscena {
@@ -121,7 +131,7 @@ export function crearDocumentoEscena(): DocumentoEscena {
     camara: { posicion: [0, 0, 6], objetivo: [0, 0, 0], fov: 50 },
     luces: [],
     pistas: [],
-    actuacion: { rutas: [], lfos: [], acumuladores: [] },
+    actuacion: { rutas: [], lfos: [], acumuladores: [], barniz: null, barnizActivo: false },
   };
 }
 
@@ -161,7 +171,7 @@ export function migrarDocumentoEscena(extra: unknown): DocumentoEscena | null {
       })),
       luces: [...(d.luces ?? [])],
       pistas: [...(d.pistas ?? [])],
-      actuacion: d.version === 3 ? copiarActuacion(d.actuacion) : { rutas: [], lfos: [], acumuladores: [] },
+      actuacion: d.version === 3 ? copiarActuacion(d.actuacion) : { rutas: [], lfos: [], acumuladores: [], barniz: null, barnizActivo: false },
     };
   }
 
@@ -188,5 +198,9 @@ function copiarActuacion(actuacion: ActuacionEscena | undefined): ActuacionEscen
     rutas: (actuacion?.rutas ?? []).map((ruta) => ({ ...ruta })),
     lfos: (actuacion?.lfos ?? []).map((lfo) => ({ ...lfo })),
     acumuladores: (actuacion?.acumuladores ?? []).map((a) => ({ ...a })),
+    barniz: actuacion?.barniz ? structuredClone(actuacion.barniz) : null,
+    barnizActivo: actuacion?.barnizActivo ?? false,
+    narrador: actuacion?.narrador ? structuredClone(actuacion.narrador) : null,
+    semilla: actuacion?.semilla ? structuredClone(actuacion.semilla) : null,
   };
 }

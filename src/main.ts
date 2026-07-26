@@ -20,6 +20,13 @@ import { EscenarioSalon } from './salones/escenario/EscenarioSalon';
 import { Transporte } from './core/Transporte';
 import { PanelTransporte } from './shell/PanelTransporte';
 import { MotorGestos } from './core/Gestos';
+import { MotorBarniz, fichaBarnizPorDefecto } from './core/Barniz';
+import type { EjeVector } from './core/VectorEstado';
+import { PanelBarniz } from './shell/PanelBarniz';
+import { MotorNarrador } from './core/Narrador';
+import { PanelNarrador } from './shell/PanelNarrador';
+import { MotorSemilla } from './core/Semilla';
+import { PanelSemilla } from './shell/PanelSemilla';
 
 const bus = new ParamBus();
 const engine = new Engine(document.getElementById('lienzo')!);
@@ -43,12 +50,18 @@ const motorLFO = new MotorLFO(bus);
 const motorAcum = new MotorAcumuladores(bus);
 const motorSinestesia = new MotorSinestesia(bus, transporte);
 const motorGestos = new MotorGestos(bus);
+const motorBarniz = new MotorBarniz(bus); // el paisaje de coherencia (biblia, Anexo I)
+const motorNarrador = new MotorNarrador(motorBarniz); // el órgano del tiempo (Etapa 7)
+const motorSemilla = new MotorSemilla(bus); // la ontogénesis visual (Etapa 3)
 const escenario = new EscenarioSalon(fabricas, bus, {
   sinestesia: motorSinestesia,
   lfo: motorLFO,
   acumuladores: motorAcum,
   transporte,
   gestos: motorGestos,
+  barniz: motorBarniz,
+  narrador: motorNarrador,
+  semilla: motorSemilla,
 });
 
 const galeria = new Galeria(
@@ -76,12 +89,49 @@ addEventListener('pointermove', (e) => {
   if (v > 0.05) motorAcum.registrarActividad(Math.min(1, v));
 });
 
-// Primera mesa de mapeo: fuentes vivas normalizadas → parámetros visuales
-new PanelSinestesia(motorSinestesia, () => galeria.destinosModulables());
+// Primera mesa de mapeo: fuentes vivas normalizadas → parámetros visuales.
+// Excluye las direcciones protegidas por el Barniz (tono/paleta): la música
+// nunca escribe el color directamente (biblia, Anexo I §V).
+new PanelSinestesia(motorSinestesia, () => {
+  const protegidas = motorBarniz.direccionesProtegidas();
+  return galeria.destinosModulables().filter((d) => !protegidas.has(d.dir));
+});
 
-// Acceso de depuración desde la consola
+// Deriva los ejes del Barniz de las direcciones con rango del salón activo.
+function ejesDelSalon(): EjeVector[] {
+  return galeria.destinosModulables().map((h): EjeVector => {
+    bus.registrarRango(h.dir, h.min, h.max);
+    const texto = h.dir + ' ' + h.etiqueta;
+    const paleta = /tono|hue|color|satur|paleta|brillo/i.test(texto);
+    return {
+      direccion: h.dir,
+      circular: /tono|hue|color/i.test(texto),
+      familia: paleta ? 'paleta' : 'forma',
+    };
+  });
+}
+
+// Panel del Barniz: monitores de energía, afinación y transición A↔B.
+new PanelBarniz(motorBarniz, ejesDelSalon);
+
+// Panel del Narrador: repertorio de barnices, umbrales y bitácora de decisiones.
+new PanelNarrador(motorNarrador);
+
+// Panel de la Semilla: el diafragma de manifestación (etapa, apertura, protocolo).
+new PanelSemilla(motorSemilla, () => ejesDelSalon().map((e) => e.direccion));
+
+// Acceso de depuración desde la consola.
+// `armarBarniz(ejes?)` monta el paisaje sobre un conjunto de direcciones del bus
+// (si se omite, usa las direcciones con rango del salón activo) y lo enciende.
+function armarBarniz(ejes?: EjeVector[]): void {
+  motorBarniz.aplicar(fichaBarnizPorDefecto(ejes ?? ejesDelSalon()));
+  motorBarniz.encender();
+  console.info(`Barniz armado sobre ${motorBarniz.ficha?.ejes.length ?? 0} ejes.`);
+}
+
 (window as unknown as Record<string, unknown>).MIA = {
   engine, bus, galeria, transporte, motorLFO, motorAcum, motorSinestesia, motorGestos,
+  motorBarniz, armarBarniz, motorNarrador, motorSemilla,
 };
 
 let errorLoop = false;
@@ -100,6 +150,24 @@ engine.arrancar((dt, tiempo) => {
     motorAcum.tick(deltaObra, tiempoObra);
     motorSinestesia.tick(deltaObra, tiempoObra, enEscenario ? marco.bpm : 15);
     motorGestos.tick(deltaObra);
+    // Métricas de Frase: máximo por tipo de acumulador (la historia de la señal).
+    let tension = 0, densidad = 0, meseta = 0;
+    for (const a of motorAcum.acumuladores) {
+      if (a.proceso === 'tension') tension = Math.max(tension, a.valor);
+      else if (a.proceso === 'densidad') densidad = Math.max(densidad, a.valor);
+      else if (a.proceso === 'meseta') meseta = Math.max(meseta, a.valor);
+    }
+    // El Narrador lee la historia y dirige (transiciona el barniz, sesga la temperatura).
+    motorNarrador.tick(deltaObra, { tension, densidad, meseta });
+    // La Semilla abre el diafragma de manifestación: germinación ganada de la
+    // música, o dirigida por el Narrador (transiciones de etapa) si dirige.
+    const objetivoApertura = motorNarrador.activo ? motorNarrador.objetivoApertura : null;
+    motorSemilla.tick(deltaObra, { tension, densidad, meseta }, objetivoApertura);
+    // El Barniz corrige DESPUÉS de que música y memoria ya empujaron el estado.
+    // Su temperatura la gobierna la tensión, sesgada por el Narrador si dirige.
+    const sesgo = motorNarrador.activo ? motorNarrador.sesgoTemperatura : 1;
+    motorBarniz.fijarTension(tension * sesgo);
+    motorBarniz.tick(deltaObra);
     salon.update(deltaObra, tiempoObra, bus.deSalon(salon.id));
     errorLoop = false;
   } catch (err) {
