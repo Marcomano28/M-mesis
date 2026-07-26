@@ -1,9 +1,9 @@
 # MIA — Guía de uso
 ### La ruta de acciones del taller
 
-*Documento vivo · actualizado el 16 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md y RUTA_AL_VIDEOCLIP.md*
+*Documento vivo · actualizado el 24 de julio de 2026 · complementa a PLAN_ESTRATEGICO.md y RUTA_AL_VIDEOCLIP.md*
 
-**Estado actual:** camerinos, fichas y **Escenario v3** utilizables. Cada personaje exporta una selección propia de **hilos individuales y gestos corporales persistentes**; una ficha de escena conserva rutas de sinestesia, LFOs, acumuladores y su **transporte musical**. La cámara de obra, luces escénicas, vestuario por actor y pistas/keyframes todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
+**Estado actual:** camerinos, fichas y **Escenario v3** utilizables. Cada personaje exporta una selección propia de **hilos individuales y gestos corporales persistentes**; una ficha de escena conserva rutas de sinestesia, LFOs, acumuladores, su **transporte musical**, el **Barniz** (el paisaje de coherencia — Etapa 2, §5b), el **Narrador** (el órgano del tiempo — Etapa 7, §5c) y la **Semilla** (la ontogénesis visual — Etapa 3, §5d). La cámara de obra, luces escénicas, vestuario por actor y pistas/keyframes todavía no forman parte de la interfaz. Para comprobar cada avance, seguir **[RUTA_DE_PRUEBAS.md](RUTA_DE_PRUEBAS.md)**.
 
 ---
 
@@ -28,6 +28,7 @@ Consola del navegador (F12): `MIA` expone `engine`, `bus`, `galeria`, `transport
 | Arriba derecha | **Panel del salón activo**: sliders, pestañas, botones de fábrica |
 | Izquierda (en el Escenario) | **🎭 Actores**: transforms de cada figura colocada |
 | Abajo izquierda | **〰 Moduladores**: los LFOs |
+| Abajo, junto a Moduladores | **◇ Mesa de Sinestesia**, **◈ Barniz (paisaje)**, **📖 Narrador (dramaturgia)** y **🌱 Semilla (manifestación)** |
 | Abajo centro | **♫ Transporte**: reloj común, BPM, compás, duración y reproducción |
 | Abajo derecha | **🗂 Fichas (n)**: la cajonera, tu depósito de obra |
 
@@ -126,6 +127,78 @@ Reglas de la casa:
 - Guardar una **ficha de Escenario** conserva LFOs, acumuladores y rutas sin guardar su valor instantáneo. Al volver, cada motor comienza desde un estado limpio y aplica la misma configuración.
 
 **Ruta corta:** `salón activo → 〰 → ➕ → destino/forma/frecuencia/amplitud`
+
+---
+
+## 5b. Barnizar (el paisaje de coherencia)
+
+> **Qué es:** el Barniz mantiene la escena dentro de *tu mundo* sin coreografiarla. En vez de vigilar reglas, define un **paisaje de energía**: la música empuja los parámetros, y el paisaje los devuelve suavemente hacia las configuraciones que reconoces como tuyas. La tensión musical decide cuánta libertad tiene el sistema para explorar. Concepto completo en **[BIBLIA_ANEXO_ENERGIA.md](BIBLIA_ANEXO_ENERGIA.md)**; plan en **[PLAN_IMPLEMENTACION_BARNIZ.md](PLAN_IMPLEMENTACION_BARNIZ.md)**.
+
+1. Abre **◈ Barniz (paisaje)** (abajo, junto a Moduladores y Sinestesia).
+2. **◈ Armar sobre el salón activo**: monta el paisaje sobre las direcciones del salón o escena actual. El panel indica cuántos **ejes** capturó. (Equivale a `MIA.armarBarniz()` en consola.)
+3. **Monitores**: `E total` es cuánto se aleja el estado de tu mundo (baja = asentado). `E₂ paleta`, `E₃ carga`, `E₄ inercia` son los términos; `temperatura` es el vagabundeo actual; `‖corrección‖` cuánto tira el paisaje este instante.
+4. **Afinación** — los dos únicos mandos que deciden si el instrumento se siente vivo o muerto:
+   - **k₄ inercia** vs. amplitud de las rutas musicales. Si la inercia gana, la música no consigue mover nada; si el empuje gana, se pierde la coherencia. *Ese equilibrio ES el instrumento.*
+   - **paso descenso**: grande oscila (rebota en el valle), pequeño no corrige a tiempo.
+   - **presupuesto**: el límite de cuánto puede corregir por tick — súbelo para un paisaje firme, bájalo para que respete tus gestos.
+   - **temp. máx (clímax)**: cuánto explora el sistema en el punto de máxima tensión.
+5. **paleta (E₂)**: define los **tonos ancla** que *son* tu paleta. La energía tira el color al ancla más cercana; varias anclas = varias paletas legítimas. `anti-arcoíris` evita rango + saturación altos a la vez.
+6. **transición A↔B**: pulsa *fijar barniz actual como B*, cambia las anclas/constantes, y mueve el slider `A → B`. El paisaje se deforma y el estado **rueda solo** hacia el mundo nuevo — sin corte.
+7. **✕ Soltar barniz** apaga el paisaje: los parámetros vuelven exactos a su base, como cualquier fuente de modulación.
+
+Reglas de la casa:
+- **La música nunca escribe el color.** Las direcciones de tono/paleta quedan protegidas: no aparecen como destino en la Mesa de Sinestesia. El color es identidad, no un parámetro reactivo.
+- El Barniz corrige **después** de que la música y la memoria empujaron; el golpe (vía Sinestesia) se siente al instante, el paisaje solo respira en la frase.
+- La **temperatura** la gobierna un acumulador de *tensión* (Etapa 1): calma → la imagen se asienta; clímax → explora. Crea uno en 〰 Moduladores para alimentarla.
+- Guardar una **ficha de Escenario** conserva el Barniz (anclas, constantes y si estaba encendido).
+
+**Ruta corta:** `◈ Armar → ajustar k₄/paso → definir anclas → (opcional) transición A↔B`
+
+---
+
+## 5c. Dirigir (el Narrador)
+
+> **Qué es:** el Narrador es el órgano del tiempo. No pinta nada: lee la **historia** de la improvisación (los acumuladores de tensión, densidad y meseta) y dirige la dramaturgia — sobre todo, *cuándo* cambiar de Barniz. Es una máquina de estados legible; cada decisión se escribe en una **bitácora** en texto. Concepto en **[BIBLIA_CONCEPTUAL.md §IV](BIBLIA_CONCEPTUAL.md)**.
+
+Los cuatro estados son un arco: **reposo → construcción → clímax → disolución → reposo**. Cada estado tiene su propio Barniz (un "rol"), y el Narrador funde entre ellos sin corte según la música.
+
+1. Arma y afina un Barniz (§5b) para el ambiente que quieras.
+2. Abre **📖 Narrador** y pulsa **capturar actual → reposo** (o el rol que corresponda). Cambia las anclas/constantes y captura los otros roles: así el mundo tiene una cara para la calma, otra para el clímax, etc. Con tener **reposo** basta para empezar.
+3. Crea en 〰 Moduladores al menos un acumulador de **tensión** (y opcionalmente *densidad* y *meseta*): son los ojos del Narrador.
+4. Activa **dirige**. A partir de ahí:
+   - El estado avanza a **construcción** cuando la tensión supera el umbral, a **clímax** cuando llega al máximo, y desciende por **disolución** cuando la energía cae.
+   - El Barniz **funde** hacia el rol del estado actual, sin corte.
+   - El **sesgo de temperatura** sube en clímax (el sistema explora) y baja en reposo (se asienta).
+   - En calma prolongada, el Narrador ejerce **iniciativa acotada**: propone una deriva suave (una floración lenta que te invita a responder), espaciada por un *cooldown*.
+5. **umbrales**: ajusta cuándo despierta, cuándo llega al clímax, cuánta calma vuelve al reposo, la duración del fundido y el cooldown de la iniciativa.
+6. La **bitácora** explica cada decisión en texto: "→ clímax: la tensión alcanza el clímax", "propongo una deriva…". La legibilidad es parte del diseño — si algo te sorprende, ahí está el porqué.
+
+Reglas de la casa:
+- El Narrador **nunca pinta un píxel** ni inventa vocabulario: solo elige y ordena en el tiempo los barnices que capturaste. Es un director con tu partitura.
+- Dirige el *cuándo*; el golpe sigue siendo instantáneo (va por Sinestesia) y el color sigue protegido (§5b).
+- Todavía no decide etapas de la Semilla ni cambios de escena — esos órganos aún no existen. Cuando lleguen, se enchufan aquí.
+- Guardar una **ficha de Escenario** conserva el repertorio, los umbrales y si estaba dirigiendo.
+
+**Ruta corta:** `armar barniz → 📖 capturar roles → crear acumulador de tensión → dirige`
+
+---
+
+## 5d. Germinar (la Semilla)
+
+> **Qué es:** el ritual de inicio. Cada actuación nace del silencio y germina por etapas dimensionales: **silencio → punto → línea → curva → superficie → volumen → constelación**. La Semilla no es una escena aparte, es un **diafragma** sobre el vocabulario: un mando de *apertura* (0..1) que decide cuánto del mundo se manifiesta. El punto y la constelación son la misma arquitectura con el diafragma más o menos abierto. Concepto en **[BIBLIA_CONCEPTUAL.md §III](BIBLIA_CONCEPTUAL.md)**.
+
+1. Abre **🌱 Semilla** y pulsa **🌱 Tomar ejes del salón activo**: elige qué direcciones "manifiestan" el mundo (escala, densidad, número de anillos…). Al cerrarse el diafragma, esos ejes colapsan hacia el **piso**; al abrirse, vuelven a su base.
+2. **modo manual**: mueve *apertura manual* de 0 a 1 y observa cómo el mundo germina y la etapa cambia. Es la forma de conocer el protocolo.
+3. **modo auto**: la germinación **se gana**. Con acumuladores de tensión/densidad activos, la música abre el diafragma; el **silencio lo repliega**, etapa a etapa. Es reversible: el final de un viaje importa tanto como su inicio.
+4. **protocolo**: el **piso** es a dónde colapsa el mundo en silencio (0 = al punto puro; súbelo si quieres que nunca desaparezca del todo). Las tasas de **germina/repliega** controlan cuán lento se gana y se pierde el mundo.
+5. **Con el Narrador dirigiendo** (§5c), la Semilla obedece su dramaturgia: reposo apenas germina, el clímax abre a constelación, la disolución repliega. Ahí el viaje entero —nacer, crecer, volver— lo conduce el Narrador leyendo tu música.
+
+Reglas de la casa:
+- La apertura **arranca siempre en el silencio** al cargar una escena: cada actuación germina de cero.
+- Manifestación plena (apertura=1) no impone nada: el mundo queda tal cual lo diseñaste. La Semilla solo actúa al *cerrar* el diafragma.
+- Escribe en el bus como una fuente más (`@semilla`); apagarla devuelve la base intacta, como todo en MIA.
+
+**Ruta corta:** `🌱 tomar ejes → manual para conocer → auto para germinar → (opcional) dejar que el Narrador conduzca`
 
 ---
 

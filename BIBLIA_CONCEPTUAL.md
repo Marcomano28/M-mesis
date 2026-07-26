@@ -104,6 +104,8 @@ Tu analogía es exacta y merece ser sistema. En generación de imágenes, una Lo
 
 El Barniz es una ficha más (las *fichas de sinestesia* del plan, elevadas de mapeos sueltos a gramática completa). Se pueden fundir dos barnices (interpolación), y el Narrador puede transicionarlos a lo largo del viaje — el "mismo" material sonoro atravesando dos barnices produce dos mundos. Eso es exactamente lo que una LoRA hace con un prompt.
 
+**Su mecánica interna está especificada en el [Anexo I — El Paisaje de Coherencia](BIBLIA_ANEXO_ENERGIA.md)**: el Barniz como función de energía `E(s)` sobre un vector de estado normalizado, con la tensión de Frase gobernando la temperatura del sistema. Las restricciones dejan de vigilarse y pasan a *tirar*.
+
 ---
 
 ## VI. El talón de Aquiles y el Big Bang

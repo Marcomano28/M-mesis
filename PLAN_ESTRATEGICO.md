@@ -140,13 +140,15 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - Sin audio: se alimentan de la actividad de los LFOs y del ratón.
 - *Criterio de éxito:* una figura que responde a la **historia** de una señal, no a su instante — se ve la diferencia a ojo.
 
-**Etapa 2 — El Barniz v1** *(la gramática estética)*
-- Ficha de barniz: paleta (rangos), gramática de movimiento (suavizados globales asimétricos), materia (vistas/grano), presupuesto de caos. Aplicable sobre cualquier salón o escena; slider de interpolación entre dos barnices.
+**Etapa 2 — El Barniz v1** *(la gramática estética)* → **plan detallado: [PLAN_IMPLEMENTACION_BARNIZ.md](PLAN_IMPLEMENTACION_BARNIZ.md)**
+- Mecánica adoptada (biblia, Anexo I): paisaje de energía `E(s)` sobre un vector de estado normalizado del bus — legibilidad, multi-pozo cromático, banda de carga, inercia — con temperatura gobernada por el acumulador de tensión (Etapa 1) y direcciones protegidas (la música nunca escribe en tono ni mezcla).
+- Ficha de barniz: anclas de tono, acoplamientos, constantes k, banda de carga, presupuesto de corrección, curva de temperatura. Aplicable sobre cualquier salón o escena; slider de interpolación entre dos barnices (el paisaje se deforma; el estado rueda solo).
 - Los transforms de actores y la actuación ya viajan en DocumentoEscena v3; el Barniz podrá apoyarse en ese contrato persistente.
 - *Criterio:* la misma escena atravesando dos barnices produce dos mundos reconocibles.
 
-**Etapa 3 — El protocolo de la Semilla** *(la dramaturgia)*
+**Etapa 3 — El protocolo de la Semilla** *(la dramaturgia)* → **v1 núcleo ✅ (24-07-2026)**
 - Máquina de etapas dimensionales (silencio→punto→línea→curva→superficie→volumen→constelación) como **presupuesto de manifestación** global (diafragma sobre el vocabulario visual, no escenas separadas). Germinación primero manual (slider), luego automática vía acumuladores de Etapa 1. Reversible. Modo actuación (fullscreen sin UI).
+- **Construido:** `MotorSemilla` — un escalar `apertura` (0..1) con siete etapas; germinación **ganada** de la música (tensión+densidad) y **reversible** con el silencio; modos manual y auto; escribe la manifestación al bus como fuente `@semilla` tirando de los ejes designados entre un piso (colapso al punto) y su base (mundo pleno). El **Narrador dirige la Semilla**: su estado dramático fija el objetivo de apertura — así se cierra el vínculo que la Etapa 7 dejó pendiente. Verificado por prueba headless (germinación, reversibilidad, colapso al piso, dirección del Narrador). Falta el modo actuación fullscreen sin UI.
 - *Criterio:* un viaje completo de 3 minutos conducido solo con LFOs que se sienta narrado, no agitado.
 
 **Etapa 4 — El oído crudo** *(entra la guitarra)*
@@ -161,8 +163,10 @@ Principio de ordenación: **las etapas 1–3 no necesitan guitarra** (se prueban
 - Capa artesanal sobre f0/envolvente: pitch estable (YIN/Essentia), vibrato (oscilación 5–7Hz sobre f0 → frecuencia+profundidad), staccato/legato, bends. Cada gesto = fuente nueva en la matriz.
 - *Criterio:* el vibrato del guitarrista mueve visiblemente algo que la energía sola no mueve.
 
-**Etapa 7 — El Narrador v1** *(el órgano del tiempo)*
+**Etapa 7 — El Narrador v1** *(el órgano del tiempo)* → **v1 núcleo ✅ (24-07-2026)**
 - Máquina de estados **legible**: lee acumuladores + historial de gestos; decide transiciones de la Semilla, cambios de universo (fichas/escenas), transiciones de Barniz y presupuesto de densidad. Iniciativa acotada con cooldown (propuestas que invitan a responder). **Bitácora en pantalla**: cada decisión del Narrador se muestra en texto — la legibilidad es requisito, no lujo.
+- **Construido:** `MotorNarrador` — cuatro estados dramáticos (reposo → construcción → clímax → disolución) sobre los acumuladores de Frase; dirige **transiciones de Barniz** por rol (fundido en vivo sin corte), **sesgo de temperatura**, e **iniciativa acotada** con cooldown; **bitácora** en texto; persiste en DocumentoEscena v3. Verificado por prueba headless (arco completo + iniciativa + sesgo).
+- **Pendiente (cuando existan sus órganos):** decisiones de etapa de la Semilla (Etapa 3) y cambios de universo (fichas/escenas). El contrato ya está diseñado para enchufarlas sin reescribir la máquina.
 - *Criterio:* en una improvisación de 10 minutos, el músico siente que "el sistema entendió la pieza" — y puede leer en la bitácora por qué hizo lo que hizo.
 
 **Etapa 8 — El dueto profundo (IA pequeña)** *(v2 de todo)*

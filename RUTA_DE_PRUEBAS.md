@@ -78,6 +78,9 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | 15-07-2026 | `main` | Transporte común de escena, persistencia y captura atómica de fichas | P16 ✅ en navegador integrado · TypeScript/build ✅ |
 | 16-07-2026 | `main` | Primer ensayo corporal: gestos lineales, envolventes y en bucle guardados por personaje | P19 ✅ en navegador integrado · ficha temporal eliminada · sin errores |
 | 16-07-2026 | `main` | Retorno actor → camerino → mismo lugar escénico y protección de indicaciones huérfanas | P20/P21 ✅ en navegador integrado · actor/ruta/ficha temporales eliminados · sin errores |
+| 24-07-2026 | `main` | Etapa 2 — Barniz como paisaje de energía: `VectorEstado`, `MotorBarniz` (4 términos + temperatura), panel, persistencia v3 y direcciones protegidas | TypeScript/build ✅ · humo headless ✅ (descenso al valle + inercia) · Bloque F 🟡 pendiente en navegador |
+| 24-07-2026 | `main` | Etapa 7 — Narrador v1: `MotorNarrador` (máquina de 4 estados sobre acumuladores), fundido en vivo del barniz por rol, sesgo de temperatura, iniciativa con cooldown, bitácora y persistencia v3 | TypeScript/build ✅ · humo headless ✅ (arco completo + iniciativa + sesgo) · Bloque G 🟡 pendiente en navegador |
+| 24-07-2026 | `main` | Etapa 3 — Semilla v1: `MotorSemilla` (diafragma de manifestación de 7 etapas), germinación ganada/reversible, manual+auto, escritura al bus; el Narrador dirige la apertura; persistencia v3 | TypeScript/build ✅ · humo headless ✅ (germinación, reversibilidad, piso, dirección) · Bloque H 🟡 pendiente en navegador |
 
 ---
 
@@ -145,6 +148,64 @@ Sí, **es momento de probar**. La ronda actual no pretende validar todavía la �
 | E19 | Duplicar un actor con gesto y accionar solo la copia | Los repertorios son independientes y no hay contaminación entre IDs |
 | E20 | `↩ Retocar en camerino`, modificar y `✓ Devolver a escena` | Se remonta la ficha interna sobre el mismo actor; transform, nombre, visibilidad, actividad y rutas compatibles permanecen |
 | E21 | Retirar durante el retoque un hilo usado por ruta/LFO/memoria | Las indicaciones sobreviven desactivadas, pierden su modulación y el actor muestra un aviso de revisión |
+
+## Bloque F — Etapa 2: el Barniz como paisaje de energía (10 min) 🧑‍🎨🤖
+
+*Implementa BIBLIA_ANEXO_ENERGIA.md y PLAN_IMPLEMENTACION_BARNIZ.md. El panel `◈ Barniz (paisaje)` está abajo a la izquierda, junto a Moduladores y Sinestesia. Atajo de consola: `MIA.armarBarniz()`.*
+
+| # | Estado | Prueba | Esperado |
+|---|---|---|---|
+| F1 | 🟡 | 🤖 `MIA.armarBarniz()` (o botón "◈ Armar sobre el salón activo") | El panel lista N ejes; el monitor `E total` empieza a dibujarse; sin errores en consola |
+| F2 | 🟡 | 🤖 Empujar el tono lejos de un ancla (`MIA.bus.set('<dir tono>', 0.9)`) con el Barniz encendido | El valor final del tono se desliza SOLO hacia el ancla más cercana en unos segundos (descenso al valle) |
+| F3 | 🟡 | 🤖 Apagar el Barniz ("✕ Soltar barniz") | Los parámetros vuelven EXACTOS a su base: el paisaje es una fuente de modulación más, no reescribe la base |
+| F4 | 🟡 | 🤖 Subir `k₄ inercia` al máximo con temperatura alta (`MIA.motorBarniz.fijarTension(1)`) | El vagabundeo se frena visiblemente; bajar `k₄` lo suelta. **Este mando es el instrumento** |
+| F5 | 🧑‍🎨 | Micrófono activo, acumulador *tensión* alimentando la temperatura; tocar suave y luego fuerte | Calma → la imagen se asienta en el valle; clímax → explora y se desestabiliza sin romper la paleta |
+| F6 | 🟡 | 🤖 Intentar en la Mesa de Sinestesia rutear una fuente al tono/paleta | La dirección protegida NO aparece como destino: la música no escribe el color (Anexo I §V) |
+| F7 | 🟡 | 🤖 "fijar barniz actual como B", cambiar anclas, mover el slider `A → B` | El paisaje se deforma y el estado rueda solo al valle nuevo; la transición no tiene corte |
+| F8 | 🟡 | 🤖 Guardar la escena con Barniz encendido, vaciar y restaurar | El Barniz reaparece con sus anclas, constantes y estado encendido (persiste en DocumentoEscena v3) |
+| F9 | 🧑‍🎨 | **Criterio de la obra**: dejar correr 10 min con música variada, grabar, mirar después | ¿Parece una obra o zapping entre efectos? Si falla: trabajar E₂ y subir las direcciones compartidas del vector, no añadir actores |
+| F10 | 🧑‍🎨 | **Criterio tocable**: tocar fuerte/suave, rápido/lento | El golpe responde al instante (va por Sinestesia, el Barniz no lo frena); la frase evoluciona con inercia. Si falla: balance `k₄` ↔ amplitud de rutas |
+
+**Verificación automática ya hecha (sin navegador):** prueba de humo headless contra el código compilado — el estado desciende exactamente al ancla de paleta, y más `k₄` reduce la varianza del vagabundeo. TypeScript + build de producción ✅.
+
+**Pendientes humanos de este bloque:** F5, F9 y F10 requieren tu oído y una grabación. El resto lo ejecuto yo por consola/UI.
+
+## Bloque G — Etapa 7: el Narrador (el órgano del tiempo) (10 min) 🧑‍🎨🤖
+
+*Máquina de estados legible que lee los acumuladores y dirige el Barniz. Panel `📖 Narrador (dramaturgia)` abajo a la izquierda. Requiere haber armado un Barniz (Bloque F) y tener acumuladores de tensión/densidad/meseta.*
+
+| # | Estado | Prueba | Esperado |
+|---|---|---|---|
+| G1 | 🟡 | 🤖 Armar barniz; en el panel del Narrador, "capturar actual → reposo/construcción/clímax/disolución" (varía las anclas entre capturas) | El repertorio guarda cuatro barnices; la bitácora anota cada captura |
+| G2 | 🟡 | 🤖 Activar "dirige"; inyectar tensión creciente (`MIA.motorAcum` con un acumulador *tensión*, o forzar actividad) | El estado recorre reposo → construcción → clímax; la bitácora explica cada salto |
+| G3 | 🟡 | 🤖 Bajar la actividad hasta el silencio | El estado desciende a disolución y vuelve a reposo; el barniz funde entre roles **sin corte** |
+| G4 | 🟡 | 🤖 Dejar el sistema en calma con un acumulador *meseta* alto | Aparecen entradas de **iniciativa** ("propongo una deriva…") espaciadas por el cooldown, no en ráfaga |
+| G5 | 🟡 | 🤖 Observar `sesgo temp.` en el monitor entre clímax y reposo | Alto en clímax (explora), bajo en reposo (se asienta) |
+| G6 | 🟡 | 🤖 Guardar la escena con el Narrador dirigiendo, vaciar y restaurar | Reaparecen repertorio, umbrales y estado activo; la bitácora arranca limpia |
+| G7 | 🧑‍🎨 | **Criterio Etapa 7**: improvisar 10 min con el Narrador dirigiendo | El músico siente que "el sistema entendió la pieza" y puede leer en la bitácora por qué hizo lo que hizo |
+
+**Verificación automática ya hecha (sin navegador):** prueba de humo headless — la máquina recorre el arco completo (reposo→construcción→clímax→disolución→reposo), la iniciativa respeta el cooldown, y el sesgo de temperatura es mayor en clímax que en reposo. TypeScript + build ✅.
+
+**Pendientes humanos de este bloque:** G7 es tu oído en una improvisación real. G1–G6 los ejecuto yo por consola/UI.
+
+## Bloque H — Etapa 3: la Semilla (la ontogénesis visual) (10 min) 🧑‍🎨🤖
+
+*El diafragma de manifestación: silencio→punto→línea→curva→superficie→volumen→constelación. Panel `🌱 Semilla (manifestación)`. Necesita ejes con rango (un salón o escena) y, para lo automático, acumuladores.*
+
+| # | Estado | Prueba | Esperado |
+|---|---|---|---|
+| H1 | 🟡 | 🤖 "🌱 Tomar ejes del salón activo"; modo **manual**; mover *apertura manual* 0→1 | La etapa recorre silencio→…→constelación; a 0 el mundo colapsa hacia el piso, a 1 se manifiesta pleno |
+| H2 | 🟡 | 🤖 Confirmar que a apertura=1 no hay efecto | Los ejes quedan en su base exacta (manifestación plena = sin constreñir) |
+| H3 | 🟡 | 🤖 Modo **auto**; inyectar música (tensión+densidad) desde silencio | La apertura **germina** sola y sube de etapa; la germinación se gana, no aparece de golpe |
+| H4 | 🟡 | 🤖 Cortar la música (silencio/meseta) | La apertura **repliega** etapa a etapa hasta el silencio: es reversible |
+| H5 | 🟡 | 🤖 Activar el Narrador dirigiendo; llevarlo a clímax | La Semilla abre a constelación por orden del Narrador aunque la señal fluctúe (Narrador dirige la etapa) |
+| H6 | 🟡 | 🤖 Ajustar **piso**: subirlo a ~0.3 | En silencio el mundo ya no colapsa al punto sino a una manifestación mínima |
+| H7 | 🟡 | 🤖 Guardar escena con la Semilla activa, vaciar y restaurar | Reaparecen ejes, modo, piso y tasas; **la apertura arranca en el silencio** (cada actuación germina de cero) |
+| H8 | 🧑‍🎨 | **Criterio Etapa 3**: un viaje de 3 min conducido solo con LFOs | Debe sentirse **narrado, no agitado**: nace del silencio, crece y vuelve |
+
+**Verificación automática ya hecha (sin navegador):** prueba de humo headless — germinación ganada y reversible, colapso al piso, manifestación plena a apertura=1, y el Narrador dirigiendo la apertura sobre el silencio. TypeScript + build ✅.
+
+**Pendientes humanos de este bloque:** H8 es tu juicio sobre si el viaje se siente narrado. H1–H7 los ejecuto yo.
 
 ## Cierre
 
