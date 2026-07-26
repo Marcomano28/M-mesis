@@ -40,6 +40,11 @@ export class ParamBus {
     this.rangos.set(direccion, { min, max });
   }
 
+  /** Rango conocido de una dirección (o null). Lo usa el Barniz para normalizar. */
+  rangoDe(direccion: string): { min: number; max: number } | null {
+    return this.rangos.get(direccion) ?? null;
+  }
+
   // ————— Plano de modulación —————
 
   modular(direccion: string, fuente: string, desplazamiento: number): void {
