@@ -24,7 +24,7 @@ export class CaracolVivo {
   private estadoVertices = new Float32Array(129 * 65 * 2);
   private nx = 128;
   private ny = 64;
-  private readonly geometria = new THREE.BufferGeometry();
+  private geometria!: THREE.BufferGeometry;
   private pos = new Float32Array(129 * 65 * 3);
   private readonly p = new THREE.Vector3();
   private readonly a = new THREE.Vector3();
@@ -32,7 +32,7 @@ export class CaracolVivo {
   private readonly curva: THREE.Line;
 
   constructor() {
-    this.prepararGeometria();
+    this.geometria = this.prepararGeometria();
     this.superficie = new THREE.Mesh(this.geometria, new THREE.MeshBasicNodeMaterial({ side: THREE.DoubleSide }));
     this.superficie.visible = false; // Conserva el raycast aunque se vista solamente de puntos.
     this.germen = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 8), new THREE.MeshBasicNodeMaterial({ color: '#ffddad' }));
@@ -44,7 +44,7 @@ export class CaracolVivo {
     this.cuerpo = {
       get semilla() { return actor.tejido.semilla; },
       get desarrollo() { return actor.desarrollo; },
-      malla: this.geometria,
+      get malla() { return actor.geometria; },
       atributoEstado: 'miaEstado',
       get revision() { return actor.revision; },
       muestrearEstado: (u, v, salida) => {
@@ -62,14 +62,16 @@ export class CaracolVivo {
     };
     this.vestuario = new Vestuario(almacenDisfraces, this.cuerpo);
     this.grupo.add(this.superficie, this.germen, this.curva, this.vestuario.grupo);
-    this.grupo.rotation.set(-Math.PI * 0.56, 0, Math.PI * 0.95);
+    // Acostado: la boca (u=1) abre hacia +X mundo y el hundimiento de curvaZ crece hacia -Z (adentro de la escena, no hacia abajo).
+    this.grupo.rotation.set(Math.PI * 0.1, -Math.PI * 0.16, 0);
     for (const obj of this.grupo.children) obj.frustumCulled = false;
     this.actualizar();
     this.vestuario.restaurar({ version: 1, capas: [
-      { id: 'nacar', intensidad: 1, detalle: 0.65 }, { id: 'peludo', intensidad: 0.8, detalle: 0.65 },
+      { id: 'alambre', intensidad: 1, detalle: 0.65 },
     ] });
   }
-  private prepararGeometria(): void {
+  /** Crea una geometría nueva: reutilizar una ya dispuesta confunde al backend WebGPU. */
+  private prepararGeometria(): THREE.BufferGeometry {
     const cantidad = (this.nx + 1) * (this.ny + 1);
     this.pos = new Float32Array(cantidad * 3);
     this.estadoVertices = new Float32Array(cantidad * 2);
@@ -81,10 +83,12 @@ export class CaracolVivo {
         const j = i + this.ny + 1; indices.push(i, j, i + 1, i + 1, j, j + 1);
       }
     }
-    this.geometria.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
-    this.geometria.setAttribute('miaEstado', new THREE.BufferAttribute(this.estadoVertices, 2).setUsage(THREE.DynamicDrawUsage));
-    this.geometria.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(this.pos.length), 3));
-    this.geometria.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); this.geometria.setIndex(indices);
+    const geometria = new THREE.BufferGeometry();
+    geometria.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    geometria.setAttribute('miaEstado', new THREE.BufferAttribute(this.estadoVertices, 2).setUsage(THREE.DynamicDrawUsage));
+    geometria.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(this.pos.length), 3));
+    geometria.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geometria.setIndex(indices);
+    return geometria;
   }
   /** Cambia el soporte visual, conservando tejido y estado de cada prenda. */
   configurarResolucion(longitud: number, contorno: number): void {
@@ -94,9 +98,14 @@ export class CaracolVivo {
     if (nx === this.nx && ny === this.ny) return;
     const traje = this.vestuario.guardar();
     for (const capa of traje.capas) this.vestuario.quitar(capa.id);
+    // Nunca reutilizar una BufferGeometry ya dispuesta: se reemplaza el objeto entero
+    // (igual que SupershapesSalon.regenerarCaracol), no solo sus atributos.
     this.geometria.dispose();
-    this.nx = nx; this.ny = ny; this.prepararGeometria();
+    this.nx = nx; this.ny = ny;
+    this.geometria = this.prepararGeometria();
+    this.superficie.geometry = this.geometria;
     this.curva.geometry.dispose();
+    this.curva.geometry = new THREE.BufferGeometry();
     this.curva.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((nx + 1) * 3), 3));
     this.ultimaEdad = NaN;
     this.actualizar();

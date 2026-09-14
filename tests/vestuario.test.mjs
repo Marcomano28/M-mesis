@@ -24,7 +24,7 @@ test('cambiar y combinar prendas conserva tejido, anatomía y pose; libera la pr
   const estado = a.tejido.guardar(), posiciones = [...a.superficie.geometry.getAttribute('position').array], pose = a.grupo.matrix.clone();
   const anterior = a.vestuario.grupo.children[0]; let liberado = false;
   anterior.material.addEventListener('dispose', () => liberado = true);
-  a.vestuario.quitar('nacar'); a.vestuario.configurar('punteado', 1); a.vestuario.configurar('corriente', 1); a.actualizar(.03);
+  a.vestuario.quitar('alambre'); a.vestuario.configurar('punteado', 1); a.vestuario.configurar('corriente', 1); a.actualizar(.03);
   assert.equal(liberado, true); assert.deepEqual(a.tejido.guardar(), estado);
   assert.deepEqual([...a.superficie.geometry.getAttribute('position').array], posiciones); assert.ok(a.grupo.matrix.equals(pose));
   a.dispose();
@@ -133,6 +133,27 @@ test('reposo no sube buffers; mutaciones directas, receta y restauración invali
   a.actualizar(0);assert.equal(pos.version,version);assert.equal(a.cuerpo.revision,rev);
   a.tejido.altura[12]=.1; a.actualizar(0); assert.ok(pos.version>version);
   const otra=pos.version; a.receta.radio=18;a.actualizar(0);assert.ok(pos.version>otra);
+  a.dispose();
+});
+
+test('cambiar la resolución reemplaza la geometría entera, no reutiliza una ya dispuesta', () => {
+  const a = new CaracolVivo();
+  a.vestuario.configurar('alambre', 1);
+  a.tejido.tocar(.4, .2, 6); a.tejido.avanzar(.05); a.actualizar();
+  const geometriaPrevia = a.superficie.geometry;
+  let dispuesta = false; geometriaPrevia.addEventListener('dispose', () => dispuesta = true);
+  a.configurarResolucion(40, 20);
+  assert.equal(dispuesta, true, 'la geometría anterior debe liberarse, no reutilizarse');
+  assert.notEqual(a.superficie.geometry, geometriaPrevia, 'debe ser un objeto BufferGeometry nuevo');
+  assert.equal(a.cuerpo.malla, a.superficie.geometry, 'el vestuario debe ver siempre la geometría vigente');
+  assert.equal(a.superficie.geometry.getAttribute('position').count, 41 * 21);
+  // El disfraz recreado tras el cambio de resolución debe apuntar a la geometría nueva, no a la vieja.
+  const prenda = a.vestuario.grupo.children.find(o => o.geometry !== undefined);
+  assert.equal(prenda.geometry, a.superficie.geometry);
+  for (const v of a.superficie.geometry.getAttribute('position').array) assert.ok(Number.isFinite(v));
+  // Repetir el cambio varias veces seguidas (como al arrastrar el control) no debe romper nada.
+  a.configurarResolucion(80, 30); a.configurarResolucion(16, 8); a.actualizar(.02);
+  assert.equal(a.superficie.geometry.getAttribute('position').count, 17 * 9);
   a.dispose();
 });
 
