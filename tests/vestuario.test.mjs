@@ -112,11 +112,46 @@ test('equivalencia con la referencia: misma anatomía, fibras y corriente, sin r
     for (let i=2;i<6;i++) {
       const a=antes.vestuario.grupo.children[i], b=despues.vestuario.grupo.children[i];
       if (!b.visible) continue; // La versión optimizada no dibuja ni reconstruye capas invisibles.
-      for(const nombre of ['position','color']) assert.deepEqual(b.geometry.getAttribute(nombre).array,a.geometry.getAttribute(nombre).array);
+      for(const nombre of ['position','color']) {
+        const refArr=a.geometry.getAttribute(nombre).array, propioArr=b.geometry.getAttribute(nombre).array;
+        // 'peludo' (i=4) reserva un búfer más grande para la cantidad de pelos ajustable;
+        // por defecto solo usa (y dibuja) el mismo prefijo que la referencia congelada.
+        assert.deepEqual(i===4 ? propioArr.subarray(0,refArr.length) : propioArr, refArr);
+      }
     }
-    assert.deepEqual(despues.vestuario.guardar(),antes.vestuario.guardar());
+    const trajeDespues = despues.vestuario.guardar();
+    const capaPeluda = trajeDespues.capas.find(c => c.id==='peludo');
+    if (capaPeluda) delete capaPeluda.parametros; // cantidad de pelos: control nuevo, ausente en la referencia
+    assert.deepEqual(trajeDespues,antes.vestuario.guardar());
   }
   antes.dispose();despues.dispose();
+});
+
+test('la cantidad de pelos recorta con drawRange, sin redimensionar ni recrear el búfer', () => {
+  const a = new CaracolVivo();
+  a.vestuario.quitar('alambre'); // el constructor viste 'alambre' por defecto; aislamos 'peludo'
+  a.vestuario.configurar('peludo', 1, .5);
+  const capaInicial = a.vestuario.configuracion().find(c => c.id === 'peludo');
+  assert.equal(capaInicial.parametros.cantidad, 1000, 'valor por defecto: igual a la densidad histórica fija');
+  const prenda = a.vestuario.grupo.children[0];
+  const geometriaOriginal = prenda.geometry;
+  a.actualizar();
+  assert.equal(prenda.geometry.drawRange.count, 1000 * 4 * 2, 'con 1000 pelos y 4 tramos cada uno, se dibujan 1000*4*2 vértices');
+
+  a.vestuario.configurar('peludo', 1, .5, { cantidad: 200 });
+  assert.equal(a.vestuario.grupo.children[0], prenda, 'no se recrea la prenda al cambiar la cantidad');
+  assert.equal(prenda.geometry, geometriaOriginal, 'el búfer sigue siendo el mismo objeto: nunca se redimensiona');
+  a.actualizar();
+  assert.equal(prenda.geometry.drawRange.count, 200 * 4 * 2);
+  for (const v of prenda.geometry.getAttribute('position').array) assert.ok(Number.isFinite(v));
+
+  a.vestuario.configurar('peludo', 1, .5, { cantidad: 3000 });
+  a.actualizar();
+  assert.equal(prenda.geometry.drawRange.count, 3000 * 4 * 2, 'el máximo reservado por el búfer es un valor válido');
+
+  assert.throws(() => a.vestuario.configurar('peludo', 1, .5, { cantidad: 3001 }), /fuera de rango/, 'por encima del máximo reservado: rechazado');
+  assert.throws(() => a.vestuario.configurar('peludo', 1, .5, { cantidad: 49 }), /fuera de rango/, 'por debajo del mínimo: rechazado');
+  a.dispose();
 });
 
 test('superficies comparten geometría; retirar una capa conserva todos los buffers corporales', () => {

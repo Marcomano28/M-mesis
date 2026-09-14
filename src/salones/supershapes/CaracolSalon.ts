@@ -385,10 +385,11 @@ function crearSuperficie(cuerpo, alambre) {
     geometria.getAttribute('color').needsUpdate = true;
   }, dispose() { geometria.dispose(); material.dispose(); } };
 }
+const MAX_PELOS = 3000;
 function crearFibras(cuerpo, modo) {
-  const n = modo === 'punteado' ? 2048 : 1000, tramos = modo === 'peludo' ? 4 : 1;
+  const nMax = modo === 'punteado' ? 2048 : modo === 'peludo' ? MAX_PELOS : 1000, tramos = modo === 'peludo' ? 4 : 1;
   const esLinea = modo === 'peludo' || modo === 'corriente';
-  const posiciones = new Float32Array(n * (esLinea ? tramos * 2 : 1) * 3);
+  const posiciones = new Float32Array(nMax * (esLinea ? tramos * 2 : 1) * 3);
   const colores = new Float32Array(posiciones.length);
   const geometria = new THREE.BufferGeometry();
   geometria.setAttribute('position', new THREE.BufferAttribute(posiciones, 3).setUsage(THREE.DynamicDrawUsage));
@@ -398,9 +399,9 @@ function crearFibras(cuerpo, modo) {
     : new THREE.PointsNodeMaterial({ vertexColors: true, size: 0.035, sizeAttenuation: true, transparent: true, depthWrite: false });
   const objeto = esLinea ? new THREE.LineSegments(geometria, material) : new THREE.Points(geometria, material);
   objeto.frustumCulled = false;
-  const uvArr = new Float64Array(n * 2);
-  const variaciones = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
+  const uvArr = new Float64Array(nMax * 2);
+  const variaciones = new Float64Array(nMax);
+  for (let i = 0; i < nMax; i++) {
     variaciones[i] = azar(i * 3 + 2, cuerpo.semilla);
     uvArr[i * 2] = modo === 'punteado' ? (Math.floor(i / 16) + 0.5) / 128 : 0.025 + azar(i * 3, cuerpo.semilla) * 0.95;
     uvArr[i * 2 + 1] = modo === 'punteado' ? (i % 16) / 16 : azar(i * 3 + 1, cuerpo.semilla);
@@ -411,13 +412,15 @@ function crearFibras(cuerpo, modo) {
     const madurez = Math.max(0, Math.min(1, (cuerpo.desarrollo - 0.35) / 0.65));
     objeto.visible = cuerpo.desarrollo > 0.001 && c.intensidad > 0;
     material.opacity = c.intensidad;
+    const activos = modo === 'peludo' ? Math.max(1, Math.min(nMax, Math.round(c.parametros?.cantidad ?? nMax))) : nMax;
     if (material instanceof THREE.PointsNodeMaterial) material.size = 0.012 + c.detalle * 0.065;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < nMax; i++) {
       if (modo === 'corriente' && dt > 0) {
         cuerpo.flujo(uvArr[i * 2], uvArr[i * 2 + 1], velocidad);
         uvArr[i * 2] = ((uvArr[i * 2] + velocidad.x * dt * (0.1 + c.detalle * 2)) % 1 + 1) % 1;
         uvArr[i * 2 + 1] = ((uvArr[i * 2 + 1] + velocidad.y * dt * (0.1 + c.detalle * 2)) % 1 + 1) % 1;
       }
+      if (i >= activos) continue;
       if (!objeto.visible) continue;
       const u = uvArr[i * 2], v = uvArr[i * 2 + 1]; muestrear(u, v, m);
       tono(m, color);
@@ -440,6 +443,7 @@ function crearFibras(cuerpo, modo) {
       }
     }
     if (!objeto.visible) return;
+    geometria.setDrawRange(0, esLinea ? activos * tramos * 2 : activos);
     geometria.getAttribute('position').needsUpdate = true; geometria.getAttribute('color').needsUpdate = true;
     geometria.computeBoundingSphere();
   }, ...(modo === 'corriente' ? {
@@ -637,7 +641,9 @@ for (const [id, nombre, descripcion, control] of [
   ['peludo', 'Peludo', 'Fibras nacen de la superficie y se curvan con la excitación local.', 'Longitud'],
   ['corriente', 'Corriente', 'Trazadores viajan por un campo corporal sensible a la memoria.', 'Velocidad'],
 ]) almacenDisfraces.registrar({ id, nombre, descripcion, control,
-  requiere: id === 'corriente' ? ['muestrear', 'flujo'] : ['muestrear'], crear: c => crearFibras(c, id) });
+  requiere: id === 'corriente' ? ['muestrear', 'flujo'] : ['muestrear'],
+  ...(id === 'peludo' ? { controles: [{ clave: 'cantidad', nombre: 'Cantidad de pelos', min: 50, max: MAX_PELOS, paso: 50, valor: 1000 }] } : {}),
+  crear: c => crearFibras(c, id) });
 almacenDisfraces.registrar(disfrazGirih);
 almacenDisfraces.registrar(disfrazGirih2);
 
