@@ -2,6 +2,7 @@ import { CaracolVivo as CaracolReferencia } from './referencia/vestuario-v1.mjs'
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { transformWithEsbuild } from 'vite';
 const result = await build({ stdin: { contents: `export * from './src/vestuario/AlmacenDisfraces'; export * from './src/vestuario/Girih'; export * from './src/vestuario/Girih2'; export * from './src/vestuario/TexturaGirih2'; export * from './src/vestuario/disfraces'; export * from './src/salones/supershapes/CaracolVivo'; export * from './src/salones/supershapes/CaracolSalon'; export * from './src/core/DocumentoEscena'; export * from './src/salones/escenario/EscenarioSalon'; export * from './src/core/ParamBus'; export * as THREE from 'three/webgpu';`, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', loader: { '.css': 'empty' }, write: false });
 const { plegarGirih2, adquirirTexturaGirih2, motivoHankin, Vestuario, almacenDisfraces, CaracolVivo, CaracolSalon, crearActorEscena, copiarFicha, EscenarioSalon, ParamBus, THREE } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 
@@ -255,4 +256,26 @@ test('Girih II comparte textura y malla, aísla controles y libera la textura al
   assert.throws(()=>a.vestuario.configurar('girih2',1,undefined,{grupo:.3}));assert.deepEqual(a.vestuario.guardar(),propio);
   a.vestuario.quitar('girih2');assert.equal(liberado,0);b.vestuario.quitar('girih2');assert.equal(liberado,1);
   a.dispose();b.dispose();
+});
+
+test('Imprimir exporta un HTML autocontenido, sin placeholders y con script interno válido', async () => {
+  const c = new CaracolSalon();
+  c.init(new THREE.Group(), new THREE.PerspectiveCamera());
+  c.update(.05, 0, { estimulo: .4, regionU: .6, regionV: .2 });
+  c.actor.vestuario.restaurar({ version: 1, capas: [
+    { id: 'girih2', intensidad: .8, detalle: .5, parametros: { grupo: 1, puntoX: .1, puntoY: .2, zoom: 2, colorFondo: .3, desplazamiento: 0, bordes: 1, invertir: 0, cruceX: 1, cruceY: 0, plegado: 1, repeticion: 1 } },
+  ] });
+  const params = { desarrollo: 1, estimulo: .4, regionU: .6, regionV: .2, resolucionU: 32, resolucionV: 16, radio: 14, vueltas: 2, curvaZ: 1.4, escala: .45 };
+  const html = c.exportar(params);
+  assert.ok(html.startsWith('<!doctype html>'));
+  assert.equal(html.includes('__PARAMS__'), false, 'no deben quedar placeholders de parámetros sin sustituir');
+  assert.equal(html.includes('__ESTADO__'), false, 'no deben quedar placeholders de estado sin sustituir');
+  assert.ok(html.includes('type="importmap"'));
+  assert.ok(html.includes('three.webgpu.js') && html.includes('three.tsl.js'));
+  assert.ok(html.includes('"girih2"'), 'el traje activo debe viajar horneado en el HTML');
+  const bloque = html.match(/<script type="module">([\s\S]*)<\/script><\/body><\/html>/);
+  assert.ok(bloque, 'debe existir un único <script type="module"> autocontenido');
+  // Si el JS embebido tiene un error de sintaxis, esto lanza.
+  await transformWithEsbuild(bloque[1], 'caracol-export.mjs', { target: 'es2022', format: 'esm' });
+  c.dispose(new THREE.Scene());
 });
