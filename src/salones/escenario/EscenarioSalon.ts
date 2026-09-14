@@ -197,6 +197,7 @@ export class EscenarioSalon implements Salon {
       }
       if (this.solicitarRetoque) {
         folder.addButton({ title: '↩ Retocar en camerino' }).on('click', () => {
+          this.conservarCuerpos();
           this.solicitarRetoque?.(
             def.id,
             copiarFicha(def.ficha),
@@ -219,6 +220,7 @@ export class EscenarioSalon implements Salon {
   }
 
   private duplicar(def: ActorEscena): void {
+    this.conservarCuerpos();
     const copia: ActorEscena = {
       ...def,
       id: crypto.randomUUID(),
@@ -407,7 +409,14 @@ export class EscenarioSalon implements Salon {
     this.motores.lfo.refrescarDestinos();
   }
 
+  private conservarCuerpos(): void {
+    for (const vivo of this.vivos) {
+      if (vivo.salon.conservarEstadoVivo) vivo.def.ficha.extra = vivo.salon.estadoExtra?.();
+    }
+  }
+
   dispose(escena: THREE.Scene): void {
+    this.conservarCuerpos();
     this.generacionMontaje++;
     for (const v of this.vivos) this.desmontar(v);
     this.vivos = [];
@@ -424,6 +433,7 @@ export class EscenarioSalon implements Salon {
 
   /** La partitura de la escena viaja dentro de la ficha (campo extra). */
   estadoExtra(): unknown {
+    this.conservarCuerpos();
     const transporte = this.motores.transporte.exportarConfiguracion();
     this.documento.duracion = transporte.duracion;
     this.documento.bucle = transporte.bucle;

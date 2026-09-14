@@ -143,6 +143,9 @@ export interface Salon {
   /** Estado no-numérico a guardar dentro de una ficha (p.ej. actores de una escena). */
   estadoExtra?(): unknown;
 
+  /** El Escenario conserva este estado vivo al salir, duplicar o retocar al actor. */
+  conservarEstadoVivo?: boolean;
+
   /** Restaura el estado extra de una ficha cargada. */
   cargarEstadoExtra?(extra: unknown): void;
 

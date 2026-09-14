@@ -83,7 +83,7 @@ export class Galeria {
     } else {
       this.activar(salon.id);
     }
-    if (ficha.extra !== undefined) salon.cargarEstadoExtra?.(ficha.extra);
+    if (ficha.extra !== undefined || salon.conservarEstadoVivo) salon.cargarEstadoExtra?.(ficha.extra);
     this.emitirCambioDestinos();
   }
 
@@ -195,7 +195,7 @@ export class Galeria {
       this.reconstruirPanel(salon);
     }
     // Estado extra (p.ej. una escena completa restaura sus actores)
-    if (ficha.extra !== undefined) this.activo?.cargarEstadoExtra?.(ficha.extra);
+    if (ficha.extra !== undefined || salon.conservarEstadoVivo) this.activo?.cargarEstadoExtra?.(ficha.extra);
     this.emitirCambioDestinos();
   }
 

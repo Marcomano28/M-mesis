@@ -12,6 +12,7 @@ import { MotorAcumuladores } from './core/Acumuladores';
 import { PanelModuladores } from './shell/PanelModuladores';
 import { MotorSinestesia } from './core/Sinestesia';
 import { PanelSinestesia } from './shell/PanelSinestesia';
+import { CaracolSalon } from './salones/supershapes/CaracolSalon';
 import { SupershapesSalon } from './salones/supershapes/SupershapesSalon';
 import { CrossHatchSalon } from './salones/crosshatch/CrossHatchSalon';
 import { BajoRelieveSalon } from './salones/bajorelieve/BajoRelieveSalon';
@@ -35,6 +36,7 @@ await engine.init();
 // Fábricas: cómo crear instancias nuevas de cada salón (el Escenario las usa
 // para montar actores independientes a partir de fichas)
 const fabricas = {
+  caracol: (ficha: { extra?: unknown }) => new CaracolSalon(ficha.extra),
   // En el escenario Formas Exóticas solo construye la familia usada por la
   // ficha, no los cuatro camerinos completos.
   supershapes: (ficha: { params: Record<string, number> }) => new SupershapesSalon(ficha.params.modo),
@@ -65,7 +67,7 @@ const escenario = new EscenarioSalon(fabricas, bus, {
 });
 
 const galeria = new Galeria(
-  [new SupershapesSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), escenario],
+  [new SupershapesSalon(), new CaracolSalon(), new CrossHatchSalon(), new BajoRelieveSalon(), new DelaunaySalon(), escenario],
   engine,
   bus,
   motorGestos,

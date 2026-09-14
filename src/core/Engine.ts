@@ -15,8 +15,8 @@ export class Engine {
     this.camara.position.set(0, 0, 6);
   }
 
-  async init(): Promise<void> {
-    this.renderer = new THREE.WebGPURenderer({ antialias: true });
+  async init(opciones: { forceWebGL?: boolean; trackTimestamp?: boolean } = {}): Promise<void> {
+    this.renderer = new THREE.WebGPURenderer({ antialias: true, ...opciones });
     await this.renderer.init(); // WebGPU es asíncrono; aquí decide GPU o fallback
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
