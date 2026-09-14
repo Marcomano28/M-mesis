@@ -1,0 +1,36 @@
+:root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;background:#101818;color:#e8e6d8;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}button,a,input{-webkit-tap-highlight-color:transparent}button,input{font:inherit}button,a{touch-action:manipulation}
+.ensayo{position:fixed;inset:0;z-index:25;pointer-events:none;display:flex;flex-direction:column;padding:32px 42px 28px}
+.ensayo a,.ensayo button,.ensayo input,.ensayo details{pointer-events:auto}
+.cabecera{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid #ffffff16;padding-bottom:20px}
+.marca{font-family:Georgia,serif;font-size:27px;letter-spacing:5px;text-decoration:none;color:#e9e8db}.marca span{font:10px Arial,sans-serif;letter-spacing:2px;margin-left:24px;color:#93a6a0;vertical-align:middle}
+.regreso{font-size:11px;text-transform:uppercase;letter-spacing:1.7px;color:#b6c3bc;text-decoration:none}.regreso:hover{color:#fff}
+.descripcion{width:285px;margin-top:52px}.sobre{color:#98b2a7;font-size:10px;letter-spacing:2.7px;text-transform:uppercase;margin:0 0 22px}
+h1{font:normal clamp(35px,4.4vw,66px)/1.05 Georgia,'Times New Roman',serif;letter-spacing:-2px;margin:0;color:#eee9d9}h1 em{font-weight:normal;color:#d4aa8f}
+.intro{color:#aebdb4;font-size:13px;line-height:1.75;max-width:250px;margin:22px 0}
+.descripcion .linea{width:38px;height:1px;background:#9d7e68;margin:28px 0}
+.acto{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#ddbd9e;margin:0 0 11px}.relato{font:17px/1.6 Georgia,serif;color:#b9c6bc;min-height:83px;max-width:250px;margin:0}
+.instrumento{position:absolute;left:42px;bottom:114px;width:250px;display:grid;gap:19px}
+.control label{display:flex;justify-content:space-between;color:#b0c1b7;font-size:11px;letter-spacing:.4px;margin-bottom:10px}.control output{color:#d8b997;font-variant-numeric:tabular-nums}
+input[type=range]{display:block;appearance:none;width:100%;height:2px;background:#496158;accent-color:#dab99a;cursor:pointer;margin:12px 0}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:10px;height:10px;border-radius:50%;background:#e5c6a3;box-shadow:0 0 0 4px #e5c6a311}
+.acciones{display:flex;gap:9px;flex-wrap:wrap}.acciones button,.secundario{border:1px solid #718c7855;background:#26372d44;color:#c6d1c5;border-radius:3px;padding:9px 11px;font-size:11px;cursor:pointer;transition:background .15s,color .15s}
+button:hover{background:#47634c55;color:#fff}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #e9c5a2;outline-offset:5px}button[aria-pressed=true]{background:#53725d55;border-color:#89b59b}
+.principal{background:#d6b795!important;color:#19251f!important;border-color:#d6b795!important}
+.pie{margin-top:auto;display:flex;justify-content:space-between;align-items:end;border-top:1px solid #ffffff16;padding-top:20px;gap:20px}
+.nombre{font:21px Georgia,serif;letter-spacing:.1px}.nombre small{display:block;font:9px Arial,sans-serif;letter-spacing:1.9px;color:#8ca399;margin-top:8px;text-transform:uppercase}
+.indicacion{color:#99b0a4;font-size:11px;letter-spacing:.3px;text-align:center;line-height:1.8}.indicacion span{display:block;color:#79988a;font-size:10px}
+.controles-pie{display:flex;gap:8px;align-items:center}
+.testigo{position:absolute;right:42px;top:135px;width:145px}.testigo h2{font:9px Arial,sans-serif;text-transform:uppercase;letter-spacing:2px;color:#8aa797;margin:0 0 22px}.dato{margin-bottom:18px}.dato label{display:flex;justify-content:space-between;font-size:10px;color:#94ad9d;margin-bottom:8px}.barra{height:2px;background:#9db19e22;overflow:hidden}.barra i{display:block;height:100%;background:#d8b18e;transform-origin:left;transform:scaleX(0)}.dato:last-child .barra i{background:#74b8a2}
+.estado{color:#99b29f;font-size:10px;line-height:1.7;max-width:150px}.punto{display:inline-block;width:4px;height:4px;border-radius:50%;background:#a5c2a3;margin-right:6px}
+.nota{position:absolute;right:42px;bottom:112px;max-width:240px;color:#9bb3a2;font-size:10px;line-height:1.7;text-align:right}
+.ayuda{margin-top:10px;font-size:11px;line-height:1.7;color:#aabfaf;max-width:260px}.ayuda summary{cursor:pointer;color:#bfcdbb}.ayuda p{background:#13231dee;padding:12px;border:1px solid #60786166;border-radius:4px}
+.mensaje{color:#d2c3a9;font-size:11px;min-height:16px;line-height:1.5;margin:0}.cursor-cuerpo{cursor:crosshair!important}
+@media(max-height:760px) and (min-width:761px){.descripcion{margin-top:25px}.descripcion h1{font-size:44px}.intro{display:none}.descripcion .linea{margin:22px 0}.instrumento{bottom:105px;gap:12px}.relato{font-size:15px;min-height:50px}.ayuda{display:none}.testigo{top:118px}}
+@media(max-width:1000px){.testigo{width:108px;right:25px}.ensayo{padding:25px}.instrumento{left:25px;width:215px}.descripcion{width:240px}.intro{max-width:220px}.nota{right:25px}.indicacion{max-width:210px}}
+@media(min-width:761px) and (max-width:1100px){.testigo{display:none}.indicacion{display:none}}
+@media(max-width:760px){.ensayo{padding:18px}.cabecera{padding-bottom:13px}.marca{font-size:23px}.marca span{font-size:8px;margin-left:10px}.regreso{font-size:9px}.descripcion{margin-top:22px;width:210px}.sobre{font-size:8px;margin-bottom:12px}h1{font-size:37px;letter-spacing:-1px}.intro,.descripcion .linea{display:none}.acto{margin-top:18px;font-size:9px}.relato{font-size:13px;max-width:210px;min-height:45px}.testigo{display:none}.instrumento{left:18px;right:18px;bottom:111px;width:auto;grid-template-columns:1fr 1fr;column-gap:24px;row-gap:10px}.acciones{grid-column:1/-1;justify-content:center}.mensaje{grid-column:1/-1;text-align:center}.pie{padding-top:14px}.nombre{font-size:17px}.nombre small{font-size:7px}.indicacion{display:none}.controles-pie{gap:5px}.controles-pie button{font-size:10px;padding:8px}.nota,.ayuda{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:460px){.pie .nombre{display:none}.controles-pie{width:100%;justify-content:space-between}.controles-pie button{font-size:10px;padding:9px 7px}.marca span{letter-spacing:1px}.regreso{max-width:85px}}
+
+#vestido-actual{font-size:11px;color:#b7c5b8;line-height:1.5;margin:8px 0}
