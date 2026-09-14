@@ -6,6 +6,8 @@ MIA nació como una galería de efectos y se convirtió en un **taller con depó
 
 > Documentación: **[GUIA_DE_USO.md](GUIA_DE_USO.md)** (uso), **[PLAN_ESTRATEGICO.md](PLAN_ESTRATEGICO.md)** (arquitectura) y **[RUTA_AL_VIDEOCLIP.md](RUTA_AL_VIDEOCLIP.md)** (pasos técnicos hasta una performance grabada).
 
+**Ensayo corporal:** [Caracol — La memoria de una caricia](ENSAYO_CARACOL.md), una prueba interactiva de desarrollo, propagación y memoria local. Con el servidor activo, abrir `/?ensayo=caracol` o usar el enlace del taller.
+
 ---
 
 ## La idea
@@ -129,3 +131,13 @@ El ciclo del taller, la selección de hilos por ficha, DocumentoEscena v3 y el t
 ---
 
 <sub>μίμησις — *mímēsis*: "imitación", "representación". El acto de representar o imitar la realidad; en estética y filosofía, asociado a Platón y Aristóteles.</sub>
+
+**Vestuario integrado:** selecciona **Caracol vivo · Camerino** en el taller. Sus disfraces y memoria viajan en las fichas al Escenario y regresan con **Retocar en camerino**. Consulta [el recorrido completo](ENSAYO_CARACOL.md#flujo-general-caracol-vivo--camerino). Verifica con `npm run test:vestuario`.
+
+**Encargos de vestuario:** [Blueprint técnico del taller de disfraces](BLUEPRINT_TALLER_DE_DISFRACES.md): contrato corporal, optimización para varios actores, pruebas de aceptación y prompt reutilizable.
+
+**Ejemplo de optimización:** [resultados y límites del vestuario compartido](OPTIMIZACION_VESTUARIO.md). Medición CPU reproducible: `npm run bench:vestuario`. Comparación visual antes/después con el servidor activo: `/comparar-vestuario.html`.
+
+**Girih · Moro:** [trama Hankin regular y sus controles](GIRIH_HANKIN.md), integrada en el almacén común a partir de los sketches de Processing y Tiling.
+
+**Girih II · Trenzado:** [controles, fondo atenuable y estado de validación](GIRIH_II_TRENZADO.md). Nueva prenda independiente en el almacén compartido.

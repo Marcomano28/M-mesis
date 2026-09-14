@@ -1,0 +1,36 @@
+{
+  "fecha": "2026-09-13T18:56:44.281Z",
+  "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+  "node": "v22.22.0",
+  "metodo": "Hankin regular en shader; ocho rayos compartidos por celda",
+  "alcance": "CPU incremental del Girih con cuerpo en evolución, excluye anatomía, render y GPU; no mide FPS ni compara Java con JS.",
+  "celdas": [
+    50,
+    18
+  ],
+  "calentamiento": 30,
+  "muestras": 60,
+  "repeticiones": 1,
+  "filas": [
+    {
+      "actores": 1,
+      "p50": 0.007549000000039996,
+      "p95": 0.023868000000106804
+    },
+    {
+      "actores": 4,
+      "p50": 0.011613000000124885,
+      "p95": 0.03882100000009814
+    },
+    {
+      "actores": 8,
+      "p50": 0.017237000000022817,
+      "p95": 0.09332999999969616
+    },
+    {
+      "actores": 16,
+      "p50": 0.04988299999968149,
+      "p95": 0.2541139999993902
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "fecha": "2026-09-13",
+  "tipo": "equivalencia",
+  "resolucion": [
+    256,
+    256
+  ],
+  "nota": "Antes/después dentro de cada backend; misma cámara, receta, estado y luz. Diez ciclos de retirada y reposición por combinación de edad/prenda.",
+  "resultados": [
+    {
+      "backend": "webgpu",
+      "filas": [
+        {
+          "edad": 0.18,
+          "id": "nacar",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.18,
+          "id": "alambre",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.18,
+          "id": "todas",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.6,
+          "id": "nacar",
+          "media": 3.814697265625e-06,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.6,
+          "id": "alambre",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.6,
+          "id": "todas",
+          "media": 3.814697265625e-06,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "nacar",
+          "media": 1.52587890625e-05,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "alambre",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "todas",
+          "media": 7.62939453125e-06,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "diagnostico",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        }
+      ]
+    },
+    {
+      "backend": "webgl2",
+      "filas": [
+        {
+          "edad": 0.18,
+          "id": "nacar",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.18,
+          "id": "alambre",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.18,
+          "id": "todas",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.6,
+          "id": "nacar",
+          "media": 3.814697265625e-06,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.6,
+          "id": "alambre",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 0.6,
+          "id": "todas",
+          "media": 3.814697265625e-06,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "nacar",
+          "media": 2.288818359375e-05,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "alambre",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "todas",
+          "media": 1.52587890625e-05,
+          "maximo": 1,
+          "canalesMayorQueUno": 0
+        },
+        {
+          "edad": 1,
+          "id": "diagnostico",
+          "media": 0,
+          "maximo": 0,
+          "canalesMayorQueUno": 0
+        }
+      ]
+    }
+  ]
+}
