@@ -63,7 +63,7 @@ export class CaracolVivo {
     this.vestuario = new Vestuario(almacenDisfraces, this.cuerpo);
     this.grupo.add(this.superficie, this.germen, this.curva, this.vestuario.grupo);
     // Acostado: la boca (u=1) abre hacia +X mundo y el hundimiento de curvaZ crece hacia -Z (adentro de la escena, no hacia abajo).
-    this.grupo.rotation.set(Math.PI * 0.1, -Math.PI * 0.16, 0);
+    this.grupo.rotation.set(-Math.PI * 0.5, -Math.PI , -Math.PI * 0.7 );
     for (const obj of this.grupo.children) obj.frustumCulled = false;
     this.actualizar();
     this.vestuario.restaurar({ version: 1, capas: [
