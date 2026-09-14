@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:caracol": "node --test tests/caracol.test.mjs",
+    "test:vestuario": "node --test tests/caracol.test.mjs tests/vestuario.test.mjs",
+    "bench:vestuario": "node scripts/medir-vestuario.mjs"
   },
   "dependencies": {
     "@types/delaunator": "^5.0.3",
